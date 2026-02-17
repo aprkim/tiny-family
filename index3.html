@@ -1140,7 +1140,7 @@ input::placeholder { color: var(--muted2); }
 </div>
 
 <script type="module">
-import MiniChat from 'https://proto2.makedo.com:8883/v04/scripts/minichat-api.js';
+import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/minichat-api.js';
 
 // ===== Firebase =====
 const FIREBASE_DB = 'https://tiny-room-3967e-default-rtdb.firebaseio.com';
@@ -1567,23 +1567,19 @@ window.toggleLiveCam = () => {
 
 window.toggleLiveScreen = () => {
     const screenTileId = `tile-${MiniChat.memberId}-screenshare`;
-    const existingTile = document.getElementById(screenTileId);
-    const isCurrentlySharing = existingTile && existingTile.style.display !== 'none';
+    let existingTile = document.getElementById(screenTileId);
 
-    if (isCurrentlySharing) {
-        existingTile.remove();
-        updateGridLayout();
-        MiniChat.toggleScreenshare();
-    } else {
-        if (!existingTile) {
-            const tile = createVideoTile(MiniChat.memberId, localName, 'screenshare', true);
-            if (tile) {
-                tile.style.display = 'none';
-                document.getElementById('videoGrid').appendChild(tile);
-            }
+    // Ensure tile exists before starting (Element-First Rule)
+    if (!existingTile) {
+        const tile = createVideoTile(MiniChat.memberId, localName, 'screenshare', true);
+        if (tile) {
+            tile.style.display = 'none';
+            document.getElementById('videoGrid').appendChild(tile);
         }
-        MiniChat.toggleScreenshare();
     }
+
+    // Let localMediaChange handle showing/removing the tile
+    MiniChat.toggleScreenshare();
 };
 
 // ===== Leave Room =====
@@ -2256,6 +2252,11 @@ MiniChat.on('localMediaChange', () => {
         } else {
             screenTile.remove();
         }
+    }
+
+    // Safety: remove any orphaned screenshare tiles when not sharing
+    if (!screen.video) {
+        document.querySelectorAll(`.video-tile[data-member-id="${MiniChat.memberId}"][data-stream-type="screenshare"]`).forEach(t => t.remove());
     }
 
     updateGridLayout();
