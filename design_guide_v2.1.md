@@ -1,7 +1,7 @@
-# DESIGN_GUIDE_v2.0
+# DESIGN_GUIDE_v2.1
 
-Version: 2.0
-Last updated: 2026-02-09 4:15 PM
+Version: 2.1
+Last updated: 2026-02-18
 
 ---
 
@@ -248,9 +248,10 @@ Indicator visibility must be **immediately obvious** at any tile size:
 ## Tile Lifecycle Rules
 
 - Create tile on room entry or member visibility
-- **Remote tiles only appear when the participant is LIVE** — a participant in PRE-LIVE is not visible to others (no WebRTC connection, no media transmitted)
-- **Do NOT remove tiles** on LIVE → PRE-LIVE
-- Remove tiles only when displayStatus = **INACTIVE** or explicit exit
+- **Remote tiles appear when the participant is LIVE or PRE-LIVE** — both active and pre-live members are visible to others
+- **Do NOT remove camera tiles** on LIVE → PRE-LIVE — they may rejoin
+- **Screenshare tiles are ephemeral** — remove entirely when sharing stops (`remoteStreamEnd` for screenshare)
+- Remove camera tiles only when displayStatus = **INACTIVE** or explicit exit
 
 ---
 
@@ -283,10 +284,10 @@ Indicator visibility must be **immediately obvious** at any tile size:
 ### Screen Share Tile Semantics
 
 - Screen share tiles:
-  - Do NOT show name labels
+  - Show a **name label** identifying whose screen is being shared (e.g. "April's Screen", "Your Screen")
   - Do NOT show mic/camera indicators
   - Do NOT show LIVE badges
-- Screen share is content, not a participant
+- Screen share is content with ownership attribution
 
 ### Screen Share Transitions
 
@@ -530,12 +531,14 @@ Accessibility:
 - MINI_GUIDE controls behavior
 - DESIGN_GUIDE controls UI
 - PRE-LIVE ≠ EXIT
-- Tiles persist across LIVE ⇄ PRE-LIVE
+- Camera tiles persist across LIVE ⇄ PRE-LIVE; screenshare tiles removed on stream end
+- Remote members visible in both LIVE and PRE-LIVE states
+- Screen share tiles show name label but no indicators or badges
 - Media indicators always visible
 - Screen share = separate tile
 - Calm, human-first design
 
 ---
 
-End of DESIGN_GUIDE_v2.3
+End of DESIGN_GUIDE_v2.1
 
