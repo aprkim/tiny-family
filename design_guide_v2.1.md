@@ -215,7 +215,7 @@ Each **camera tile** contains:
 
 Tiles never contain controls.
 
-> **Screen share tiles** are an exception — they show content only (no name, no indicators, no badges). See [Screen Share Tile Semantics](#screen-share-tile-semantics).
+> **Screen share tiles** are an exception — they show a name label and LIVE badge, but no mic/camera indicators. See [Screen Share Tile Semantics](#screen-share-tile-semantics).
 
 ### Initials Placeholder
 
@@ -285,8 +285,8 @@ Indicator visibility must be **immediately obvious** at any tile size:
 
 - Screen share tiles:
   - Show a **name label** identifying whose screen is being shared (e.g. "April's Screen", "Your Screen")
+  - Show **LIVE badge** (same styling as camera tiles)
   - Do NOT show mic/camera indicators
-  - Do NOT show LIVE badges
 - Screen share is content with ownership attribution
 
 ### Screen Share Transitions
@@ -533,7 +533,7 @@ Accessibility:
 - PRE-LIVE ≠ EXIT
 - Camera tiles persist across LIVE ⇄ PRE-LIVE; screenshare tiles removed on stream end
 - Remote members visible in both LIVE and PRE-LIVE states
-- Screen share tiles show name label but no indicators or badges
+- Screen share tiles show name label and LIVE badge, but no mic/camera indicators
 - Media indicators always visible
 - Screen share = separate tile
 - Calm, human-first design
