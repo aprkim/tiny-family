@@ -2075,7 +2075,7 @@ function updateMemberIndicators(memberId, streamType) {
                 }
             } else {
                 const m = MiniChat.getMember(memberId);
-                if (m?.displayStatus === 'LIVE') {
+                if (m?.displayStatus === 'LIVE' || m?.displayStatus === 'ACTIVE') {
                     badge.classList.add('live');
                     badge.textContent = 'LIVE';
                 }
@@ -2135,7 +2135,7 @@ MiniChat.on('localJoined', async () => {
     const members = await MiniChat.getMembers();
     members.forEach(m => {
         if (m.id === MiniChat.memberId) return;
-        if (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE') {
+        if (m.displayStatus === 'LIVE' || m.displayStatus === 'ACTIVE' || m.displayStatus === 'PRE-LIVE') {
             const tile = createVideoTile(m.id, m.displayName, 'camera', false);
             if (tile) document.getElementById('videoGrid').appendChild(tile);
         }
@@ -2173,7 +2173,7 @@ MiniChat.on('remoteJoined', (memberId) => {
 
 MiniChat.on('remoteLeft', (memberId) => {
     const m = MiniChat.getMember(memberId);
-    if (m?.displayStatus === 'EXITED') {
+    if (m?.displayStatus === 'EXITED' || m?.displayStatus === 'INACTIVE') {
         document.getElementById(`tile-${memberId}-camera`)?.remove();
         document.getElementById(`tile-${memberId}-screenshare`)?.remove();
         updateGridLayout();
