@@ -1,23 +1,88 @@
-# VibeLive Integration Guide v1.0
+# VibeLive Integration Guide
 
-This document combines the **MiniChat API Guide** (SDK behavior & lifecycle) and the **Design Guide** (visual & interaction rules) into a single reference for building VibeLive-powered apps.
+**Combined reference — MiniChat API Guide v0.63 + Design Guide v2.3**
 
-**Structure:**
-- Part 1: MiniChat API Guide (behavior, events, SDK usage)
-- Part 2: Design Guide (visual rules, layout, interaction)
-
-**Authority Rule:** When these two parts conflict:
-- **Part 1 (API Guide)** defines system behavior and lifecycle semantics
-- **Part 2 (Design Guide)** defines visual presentation and interaction rules
+Last updated: 2026-02-19
 
 ---
+
+## Authority Rule
+
+When the API Guide and Design Guide conflict:
+
+- **API Guide (Part 1)** defines system behavior and lifecycle semantics
+- **Design Guide (Part 2)** defines visual presentation and interaction rules
+
+For visual conflicts, the Design Guide wins. See [CONFLICTS.md](CONFLICTS.md) for the full list of known conflicts and their resolutions.
+
 ---
 
-# Part 1: MiniChat API Guide
+## Implementation Checklist
+
+Scannable list of every functional requirement across both guides. Use this to verify completeness.
+
+### Entry Flow
+- [ ] Name input (max 24 chars, autofocus)
+- [ ] "Start a Room" button creates room via `signup()` → `createRoom()` → `enterByRoomCode()`
+- [ ] "Join" button joins room via `signup()` → `enterByRoomCode(code)`
+- [ ] Dynamic button priority: "Start a Room" is primary when no code entered; "Join" becomes primary when code is entered
+- [ ] URL deep linking: auto-fill room code from `?code=` parameter, swap "Join" to primary
+- [ ] Shareable invite link: copy-link produces full URL with `?code=<roomCode>`, not just the raw code
+- [ ] Name validation hint on disabled button click
+- [ ] Button loading states (spinner + "Creating..." for Start; disabled-only for Join)
+
+### Pre-Live Screen
+- [ ] Topbar: app name (left) + room code + copy-code button + copy-link button (right)
+- [ ] Camera preview tile (~70% of available space)
+- [ ] Camera and mic toggle buttons
+- [ ] "Go Live" primary CTA + "Back" secondary button
+- [ ] No remote participants visible
+- [ ] Element-First Rule: both camera and screenshare tiles created and registered here
+
+### Live Screen
+- [ ] Same topbar as pre-live
+- [ ] Video grid with 16:9 tiles, responsive layout (grid-1 through grid-8 CSS classes)
+- [ ] Presentation mode: single `#videoGrid` switches layout when screenshare or spotlight is active
+- [ ] Presentation mode creates `.screenshare-area` (featured row) + `.camera-strip` (thumbnail row) dynamically
+- [ ] Camera toggle (`toggleVideo()`), mic toggle (`toggleMuteAudio()`), screenshare toggle
+- [ ] Leave button with danger styling, visually separated
+- [ ] Remote tiles created on demand in `remoteStreamStart`
+- [ ] Remote tiles removed only when `displayStatus === 'INACTIVE'`
+- [ ] Tile interactions: drag handle (top-left), resize handle (bottom-right), appear on hover
+- [ ] Tile actions: spotlight button on camera tiles, fullscreen button on screenshare tiles
+- [ ] Reset layout button visible when tiles have been dragged/resized
+
+### Media & Tiles
+- [ ] Local camera tile: video/placeholder visibility toggled in `localMediaChange`
+- [ ] Local screenshare tile: shown when active, **removed entirely** when inactive (re-created on next toggle)
+- [ ] Remote camera tile: video/placeholder toggled in `remoteStreamStart` / `remoteStreamEnd` / `remoteMediaChange`
+- [ ] Remote screenshare tile: created in `remoteStreamStart`, removed entirely in `remoteStreamEnd`
+- [ ] Media indicators (camera + mic) on camera tiles using inline SVG icons
+- [ ] LIVE status badge on active tiles
+- [ ] Initials placeholder when camera is off
+
+### Sharing
+- [ ] Copy-code button: copies raw room code
+- [ ] Copy-link button: copies full URL with `?code=<roomCode>`
+- [ ] "Copied!" tooltip below button for 1.5 seconds (not a global toast)
+
+### Theme
+- [ ] Dark mode default, light mode option
+- [ ] Theme toggle in bottom-right corner (fixed, z-index: 100)
+- [ ] Choice persists via localStorage
+- [ ] Respect `prefers-color-scheme` on first visit
+
+---
+
+---
+
+# Part 1 — MiniChat API Guide
 
 **Build an anonymous video chat app with MiniChat**
 
-Version 0.6 | February 15, 2026
+Version 0.63 | February 18, 2026
+
+> **Note:** Code examples in this section have been updated to comply with the Design Guide's visual rules (inline SVG icons instead of emoji, "Your Screen" label for local screenshare, LIVE badge on screenshare tiles). See [CONFLICTS.md](CONFLICTS.md) for details.
 
 ---
 
@@ -44,7 +109,7 @@ Import and initialize MiniChat:
 <button onclick="MiniChat.startLive()">Go Live</button>
 ```
 
-> **Test Credentials**: Use `contextId: 'Kw6w6w6w6w'` and `contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB'` for quick testing.
+> **🧪 Test Credentials**: Use `contextId: 'Kw6w6w6w6w'` and `contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB'` for quick testing.
 
 `MiniChat` is automatically available on `window` — all methods work directly in `onclick` handlers without any extra wiring.
 
@@ -55,8 +120,8 @@ Import and initialize MiniChat:
 Anonymous users have two paths — **create** or **join** a room:
 
 ```
-signup(name) -> createRoom(title) -> enterByRoomCode(code) -> startLive()
-signup(name) -> enterByRoomCode(code) -> startLive()
+signup(name) → createRoom(title) → enterByRoomCode(code) → startLive()
+signup(name) → enterByRoomCode(code) → startLive()
 ```
 
 ### Create a Room
@@ -77,6 +142,17 @@ await MiniChat.enterByRoomCode('X7kQ3m');
 // Now in PRE-LIVE — call startLive() when ready
 ```
 
+### Sharing a Room
+
+When sharing the room code with others, **always share a full URL** with `?code=<roomCode>`, not the raw code alone. This enables deep linking — recipients land directly in the join flow with the code pre-filled.
+
+```javascript
+// Build a shareable invite link
+const inviteUrl = `${window.location.origin}${window.location.pathname}?code=${room.room_code}`;
+```
+
+See also: Design Guide §[Shareable Invite Link](#shareable-invite-link) and §[URL Deep Linking](#url-deep-linking-code).
+
 ### Change Display Name on Rejoin
 
 Pass an optional `displayName` to update your name when entering a channel:
@@ -96,10 +172,10 @@ await MiniChat.enterByRoomCode('X7kQ3m', 'NewName');
 
 ---
 
-## Member Lifecycle: PRE-LIVE -> LIVE -> EXIT
+## Member Lifecycle: PRE-LIVE → LIVE → EXIT
 
 ```
-PRE-LIVE    ->    LIVE    ->    PRE-LIVE or EXIT
+PRE-LIVE    →    LIVE    →    PRE-LIVE or EXIT
 (preparing)      (streaming)   (back or gone)
 ```
 
@@ -112,7 +188,9 @@ PRE-LIVE    ->    LIVE    ->    PRE-LIVE or EXIT
 
 - `startLive()` — Connect WebRTC, go LIVE
 - `stopLive()` — Disconnect WebRTC, return to PRE-LIVE (quick rejoin possible)
-- `exitRoom()` — Full teardown, release camera/mic
+- `exitRoom()` — Full teardown, release camera/mic, stay logged in (can enter a different room)
+- `backToList()` — Like `exitRoom()` but intended for multi-room flows: stops media and clears the channel, returning the user to a room-selection state without logging out
+- `logout()` — Full session teardown including authentication
 
 ---
 
@@ -157,16 +235,16 @@ Use `toggleMuteVideo()` only for specialized cases (e.g., "hide self while fixin
 
 ### Screenshare
 
-Screen sharing is typically offered in **LIVE mode only**. Follow the Element-First Rule: create and register the screenshare tile in `channelSelected` (hidden with `display: none`) so the element is ready before the user clicks the screenshare button.
+Screen sharing is typically offered in **LIVE mode only**. In both cases, follow the Element-First Rule: create and register the screenshare tile in `channelSelected` (hidden with `display: none`).
 
 ### Reading Local Media State
 
 ```javascript
 MiniChat.mediaState
-// -> { audio: true/false, video: true/false, audioMuted: true/false, videoMuted: true/false }
+// → { audio: true/false, video: true/false, audioMuted: true/false, videoMuted: true/false }
 
 MiniChat.screenState
-// -> { video: true/false, videoMuted: true/false }
+// → { video: true/false, videoMuted: true/false }
 ```
 
 ### Reading Remote Media State
@@ -198,7 +276,7 @@ In **LIVE**, the two states naturally align. No special synchronization logic is
 
 ## The Element-First Rule
 
-> **Register video elements before streams arrive, not in response to them.**
+> **For local streams: register video elements before streams arrive, not in response to them.**
 
 When MiniChat creates a media stream, it immediately attaches to whatever `<video>` element you've registered. No element registered = stream silently lost.
 
@@ -209,12 +287,14 @@ When MiniChat creates a media stream, it immediately attaches to whatever `<vide
 | **Remote camera** | Inside `remoteStreamStart` handler | Stream is arriving *right now* |
 | **Remote screenshare** | Inside `remoteStreamStart` handler | Stream is arriving *right now* |
 
+> **Note:** The "before streams arrive" requirement applies only to **local** streams. For remote streams, `remoteStreamStart` is both the signal and the correct registration moment — there is nothing to pre-create.
+
 ```javascript
-// Register both local elements at tile creation
+// ✅ Register both local elements at tile creation
 MiniChat.setLocalCamera(cameraVideoEl);
 MiniChat.setLocalScreen(screenVideoEl);
 
-// DON'T create elements in localMediaChange — too late!
+// ❌ DON'T create elements in localMediaChange — too late!
 ```
 
 **Why this matters for screenshare:** When you call `toggleScreenshare()`, the stream is produced **instantly**. If you wait until `localMediaChange` fires to create the tile and call `setLocalScreen()`, the stream has already been produced with no element to attach to — result: blank screen. The element must exist and be registered **before** the user clicks the screenshare button.
@@ -245,9 +325,11 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     const placeholder = document.createElement('div');
     placeholder.className = 'video-placeholder';
     if (streamType === 'camera') {
-        placeholder.innerHTML = `<span>${isLocal ? 'You' : name}</span>`;
+        // Show initials in a circle
+        placeholder.innerHTML = `<span>${getInitials(name)}</span>`;
     } else {
-        placeholder.innerHTML = `<span>${isLocal ? 'Your' : name + "'s"} Screen</span>`;
+        // Show screen icon for screenshare placeholder
+        placeholder.innerHTML = `<span class="ph-icon"><!-- screen SVG icon --></span>`;
     }
 
     const video = document.createElement('video');
@@ -258,24 +340,64 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     videoContainer.appendChild(placeholder);
     videoContainer.appendChild(video);
 
-    // Info bar (camera tiles only — screenshare tiles are content-only)
+    // Info bar
+    const memberInfo = document.createElement('div');
+    memberInfo.className = 'member-info';
     if (streamType === 'camera') {
-        const memberInfo = document.createElement('div');
-        memberInfo.className = 'member-info';
         memberInfo.innerHTML = `
-            <span class="member-name">${isLocal ? 'You' : name}</span>
+            <span class="member-name">${isLocal ? `${name} (You)` : name}</span>
             <div class="member-indicators">
                 <span class="status-badge"></span>
-                <span class="indicator cam-video" title="Camera">cam-icon</span>
-                <span class="indicator cam-audio" title="Microphone">mic-icon</span>
+                <span class="indicator cam-video" title="Camera"><!-- SVG icon --></span>
+                <span class="indicator cam-audio" title="Microphone"><!-- SVG icon --></span>
             </div>
         `;
-        tile.appendChild(videoContainer);
-        tile.appendChild(memberInfo);
     } else {
-        tile.appendChild(videoContainer);
+        memberInfo.innerHTML = `
+            <span class="member-name">${isLocal ? 'Your' : name + "'s"} Screen</span>
+            <div class="member-indicators">
+                <span class="status-badge">LIVE</span>
+            </div>
+        `;
     }
 
+    tile.appendChild(videoContainer);
+    tile.appendChild(memberInfo);
+
+    // Drag handle (top-left, hover-reveal)
+    const dragHandle = document.createElement('button');
+    dragHandle.className = 'drag-handle';
+    dragHandle.innerHTML = '<!-- drag SVG icon -->';
+    tile.appendChild(dragHandle);
+
+    // Resize handle (bottom-right, hover-reveal)
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    tile.appendChild(resizeHandle);
+
+    // Tile actions (top-right, hover-reveal)
+    const tileActions = document.createElement('div');
+    tileActions.className = 'tile-actions';
+    if (streamType === 'camera') {
+        // Camera tiles get a spotlight button
+        const spotlightBtn = document.createElement('button');
+        spotlightBtn.className = 'tile-action-btn spotlight-btn';
+        spotlightBtn.title = 'Spotlight';
+        spotlightBtn.innerHTML = '<!-- expand SVG icon -->';
+        spotlightBtn.onclick = () => toggleSpotlight(tile, spotlightBtn);
+        tileActions.appendChild(spotlightBtn);
+    } else {
+        // Screenshare tiles get a fullscreen button
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.className = 'tile-action-btn fullscreen-btn';
+        fullscreenBtn.title = 'Toggle fullscreen';
+        fullscreenBtn.innerHTML = '<!-- fullscreen SVG icon -->';
+        fullscreenBtn.onclick = () => toggleTileFullscreen(tile, fullscreenBtn);
+        tileActions.appendChild(fullscreenBtn);
+    }
+    tile.appendChild(tileActions);
+
+    // All tiles go to #videoGrid — layout is handled by updateGridLayout()
     document.getElementById('videoGrid').appendChild(tile);
 
     // Register local elements immediately (Element-First Rule)
@@ -286,16 +408,24 @@ function createVideoTile(memberId, name, streamType, isLocal) {
             MiniChat.setLocalScreen(video);
         }
     }
+
+    // Update grid layout to accommodate the new tile
+    updateGridLayout();
 }
 ```
 
 **Key points:**
 - Each tile is independent — camera and screenshare are separate grid items
 - `data-member-id` and `data-stream-type` attributes enable CSS targeting
-- CSS example: `.video-tile[data-stream-type="screenshare"] { grid-column: span 2; }`
 - `playsInline` is required for iOS
 - `muted = true` on local video prevents audio feedback
-- **Screenshare tiles show a name label but no indicators or badges** (see Design Guide: Screen Share Tile Semantics)
+- **All tiles go to `#videoGrid`** — there is no separate `#screenshareGrid`. Presentation mode layout (featured area + camera strip) is handled dynamically by `updateGridLayout()`
+- **Tile actions:** Camera tiles get a spotlight button; screenshare tiles get a fullscreen button. Both appear on hover only.
+- **Drag + resize handles** are included on every tile for live room interaction
+- **Initials placeholder:** Camera tiles show initials (not the full name) in a styled circle
+- **Icons:** Use inline SVG icons for all indicators and buttons — no emoji (see §Core Design Philosophy)
+- **Screenshare labels:** Local user sees "Your Screen"; remote users see "Name's Screen"
+- **`updateGridLayout()`** is called after adding the tile to recompute the grid layout
 
 ---
 
@@ -303,7 +433,7 @@ function createVideoTile(memberId, name, streamType, isLocal) {
 
 When implementing preview modes or featured speaker layouts, **always move the existing DOM element** — never remove and recreate.
 
-### The Safe Way: appendChild()
+### ✅ The Safe Way: appendChild()
 
 ```javascript
 // Move to preview area (PRE-LIVE)
@@ -316,17 +446,17 @@ document.getElementById('videoGrid').appendChild(tile);
 
 **Why this works:** `appendChild()` **moves** the element. The `<video>` element's `srcObject` persists. Element registration remains valid. No re-registration needed.
 
-### Mistakes That Break Streams
+### ❌ Mistakes That Break Streams
 
 ```javascript
-// Remove then recreate — stream lost
+// ❌ Remove then recreate — stream lost
 oldTile.remove();
 createVideoTile(...);
 
-// Clone the element — new element has no stream
+// ❌ Clone the element — new element has no stream
 const clone = original.cloneNode(true);
 
-// Replace innerHTML — destroys the original element
+// ❌ Replace innerHTML — destroys the original element
 container.innerHTML = tile.outerHTML;
 ```
 
@@ -411,7 +541,7 @@ MiniChat.on('remoteStreamEnd', (memberId, streamType) => {
     if (!tile) return;
 
     if (streamType === 'screenshare') {
-        // Screenshare: remove tile entirely (screenshare tiles are ephemeral)
+        // Screenshare: remove tile entirely
         tile.remove();
     } else {
         // Camera: show placeholder (audio may still be active)
@@ -425,7 +555,7 @@ MiniChat.on('remoteStreamEnd', (memberId, streamType) => {
 });
 ```
 
-> **Always create tiles on demand in `remoteStreamStart`.**
+> **⚠️ Always create tiles on demand in `remoteStreamStart`.**
 > When you call `startLive()`, WebRTC begins immediately. If others are already streaming, `remoteStreamStart` can fire **before** `remoteJoined`. If the tile doesn't exist, create it right there. Since `createVideoTile()` guards against duplicates, this is always safe.
 
 ### Video Placeholder vs Stream Presence
@@ -493,11 +623,12 @@ MiniChat.on('localMediaChange', () => {
             screenTile.querySelector('.video-placeholder')?.classList.add('hidden');
             screenTile.querySelector('video')?.classList.add('visible');
         } else {
-            screenTile.style.display = 'none';
+            screenTile.remove();   // Remove tile entirely, not just hide
         }
     }
 
     updateMemberIndicators(MiniChat.memberId);
+    updateGridLayout();   // Recompute grid after media change
 });
 ```
 
@@ -538,7 +669,7 @@ MiniChat.on('channelSelected', async (channel) => {
 });
 
 MiniChat.on('localJoined', async () => {
-    // Going LIVE: reveal remote members (ACTIVE and PRE-LIVE)
+    // Going LIVE: reveal remote members
     const members = await MiniChat.getMembers();
     members.forEach(m => {
         if (m.id === MiniChat.memberId) return;
@@ -562,6 +693,26 @@ MiniChat.on('remoteJoined', (memberId) => {
     const m = MiniChat.getMember(memberId);
     createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
 });
+```
+
+> **Design choice: who gets a tile on `localJoined`?**
+>
+> The example above creates tiles for both `'ACTIVE'` and `'PRE-LIVE'` members when you go LIVE. This is the recommended default — you see everyone already in the channel, including those still preparing.
+>
+> You can restrict to `'ACTIVE'` only if your app only wants to show members who are actively streaming:
+> ```javascript
+> // Variation: streamers only
+> if (m.displayStatus === 'ACTIVE') {
+>     createVideoTile(m.id, m.displayName, 'camera', false);
+> }
+> ```
+> The tradeoff:
+> - **`'ACTIVE' || 'PRE-LIVE'`** — everyone present gets a tile immediately; good for small groups and social apps
+> - **`'ACTIVE'` only** — tiles appear only when streaming starts; better for larger rooms or broadcast-style apps where PRE-LIVE presence is invisible by design
+>
+> Note: `remoteJoined` fires when a member goes LIVE (not when they enter PRE-LIVE), so it always represents an `'ACTIVE'` member — no filtering needed there.
+
+```javascript
 
 MiniChat.on('remoteStreamStart', (memberId, streamType) => {
     if (!MiniChat.isLive) return;  // Don't show if we're not live
@@ -582,7 +733,7 @@ member.hasScreenshare  // boolean
 
 // Fetch all current channel members from server
 const members = await MiniChat.getMembers();
-// -> [{ id, displayName, displayStatus, ... }]
+// → [{ id, displayName, displayStatus, ... }]
 ```
 
 Use `MiniChat.memberId` for your own member ID. Use `MiniChat.roomCode` for the shareable room code.
@@ -601,9 +752,21 @@ A working app in under 50 lines of JavaScript:
 <head>
     <title>MiniChat Demo</title>
     <style>
-        .video-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-        .video-tile { position: relative; width: 320px; height: 240px; background: #222; }
-        .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+        #videoGrid { display: grid; gap: 8px; padding: 8px; align-content: center; }
+        #videoGrid.grid-1 { grid-template-columns: 1fr; place-items: center; }
+        #videoGrid.grid-1 .video-tile { width: min(100%, calc((100vh - 140px) * 16 / 9)); }
+        #videoGrid.grid-2 { grid-template-columns: 1fr 1fr; }
+        #videoGrid.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+        #videoGrid.grid-4 { grid-template-columns: 1fr 1fr; }
+        #videoGrid.presentation { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+        .screenshare-area { display: flex; justify-content: center; align-items: center; gap: 8px; width: 100%; height: 100%; }
+        .camera-strip { display: flex; justify-content: center; gap: 8px; padding: 8px 0 0; overflow-x: auto; }
+        .camera-strip .video-tile { flex: 0 0 180px; width: 180px; }
+        .video-tile { position: relative; border-radius: 16px; overflow: hidden; background: #222; }
+        .video-tile::before { content: ''; display: block; padding-top: 56.25%; }
+        .video-container { position: absolute; inset: 0; }
+        .video-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+        .screenshare-area .video-tile video { object-fit: contain; background: #000; }
         .video-placeholder { position: absolute; inset: 0; display: flex;
             align-items: center; justify-content: center; color: white; font-size: 1.2em; }
         .hidden { display: none; }
@@ -628,7 +791,7 @@ A working app in under 50 lines of JavaScript:
         <button onclick="MiniChat.toggleMuteAudio()">Mute/Unmute Mic</button>
     </div>
 
-    <div id="videoGrid" class="video-grid"></div>
+    <div id="videoGrid"></div>
 
     <script type="module">
         import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js';
@@ -670,7 +833,8 @@ A working app in under 50 lines of JavaScript:
         MiniChat.on('localJoined', async () => {
             const members = await MiniChat.getMembers();
             members.forEach(m => {
-                if (m.id !== MiniChat.memberId && (m.displayStatus === 'ACTIVE' || m.displayStatus === 'PRE-LIVE')) {
+                if (m.id !== MiniChat.memberId &&
+                    (m.displayStatus === 'ACTIVE' || m.displayStatus === 'PRE-LIVE')) {
                     createVideoTile(m.id, m.displayName, 'camera', false);
                 }
             });
@@ -717,7 +881,16 @@ A working app in under 50 lines of JavaScript:
                 else { p?.classList.remove('hidden'); v?.classList.remove('visible'); }
             }
             const screenTile = document.getElementById(`tile-${MiniChat.memberId}-screenshare`);
-            if (screenTile) screenTile.style.display = MiniChat.screenState.video ? 'block' : 'none';
+            if (screenTile) {
+                if (MiniChat.screenState.video) {
+                    screenTile.style.display = 'flex';
+                    screenTile.querySelector('.video-placeholder')?.classList.add('hidden');
+                    screenTile.querySelector('video')?.classList.add('visible');
+                } else {
+                    screenTile.remove();   // Remove tile entirely
+                }
+            }
+            updateGridLayout();
         });
 
         MiniChat.on('remoteLeft', (id) => {
@@ -726,6 +899,7 @@ A working app in under 50 lines of JavaScript:
                 document.getElementById(`tile-${id}-camera`)?.remove();
                 document.getElementById(`tile-${id}-screenshare`)?.remove();
             }
+            // If PRE-LIVE, keep tiles — they stopped streaming but haven't left
         });
 
         MiniChat.on('error', (ctx, err) => console.error(`[${ctx}]`, err.message));
@@ -744,18 +918,52 @@ A working app in under 50 lines of JavaScript:
             if (streamType === 'screenshare' && isLocal) tile.style.display = 'none';
 
             tile.innerHTML = `
-                <div class="video-placeholder"><span>${streamType === 'camera'
-                    ? (isLocal ? 'You' : name)
-                    : (isLocal ? 'Your' : name + "'s") + ' Screen'}</span></div>
-                <video autoplay playsinline ${isLocal || streamType === 'screenshare' ? 'muted' : ''}></video>
+                <div class="video-container">
+                    <div class="video-placeholder"><span>${streamType === 'camera'
+                        ? (isLocal ? `${name} (You)` : name)
+                        : (isLocal ? 'Your' : name + "'s") + ' Screen'}</span></div>
+                    <video autoplay playsinline ${isLocal || streamType === 'screenshare' ? 'muted' : ''}></video>
+                </div>
             `;
 
+            // All tiles go to #videoGrid — layout handled by updateGridLayout()
             document.getElementById('videoGrid').appendChild(tile);
 
             if (isLocal) {
                 const video = tile.querySelector('video');
                 if (streamType === 'camera') MiniChat.setLocalCamera(video);
                 else MiniChat.setLocalScreen(video);
+            }
+
+            updateGridLayout();
+        }
+
+        // --- Layout management ---
+
+        function updateGridLayout() {
+            const grid = document.getElementById('videoGrid');
+            const allTiles = Array.from(grid.querySelectorAll('.video-tile')).filter(
+                c => c.style.display !== 'none'
+            );
+            const hasScreenshare = allTiles.some(c => c.dataset.streamType === 'screenshare');
+
+            grid.className = '';
+
+            if (hasScreenshare) {
+                grid.classList.add('presentation');
+                let area = grid.querySelector('.screenshare-area');
+                if (!area) { area = document.createElement('div'); area.className = 'screenshare-area'; grid.prepend(area); }
+                allTiles.filter(c => c.dataset.streamType === 'screenshare').forEach(t => area.appendChild(t));
+                let strip = grid.querySelector('.camera-strip');
+                if (!strip) { strip = document.createElement('div'); strip.className = 'camera-strip'; grid.appendChild(strip); }
+                allTiles.filter(c => c.dataset.streamType === 'camera').forEach(t => strip.appendChild(t));
+            } else {
+                const area = grid.querySelector('.screenshare-area');
+                if (area) { Array.from(area.children).forEach(t => grid.appendChild(t)); area.remove(); }
+                const strip = grid.querySelector('.camera-strip');
+                if (strip) { Array.from(strip.children).forEach(t => grid.appendChild(t)); strip.remove(); }
+                const count = allTiles.filter(c => c.classList.contains('video-tile')).length;
+                if (count > 0) grid.classList.add(`grid-${Math.min(count, 4)}`);
             }
         }
     </script>
@@ -776,10 +984,11 @@ A working app in under 50 lines of JavaScript:
 | `login(email, password)` | Login with existing account |
 | `logout()` | Logout and cleanup |
 | `createRoom(title)` | Create room, returns `{ id, room_code, title }` |
-| `enterByRoomCode(code, displayName?)` | Enter room -> PRE-LIVE (displayName optional, updates member name) |
-| `startLive()` | Connect WebRTC -> LIVE |
-| `stopLive()` | Disconnect WebRTC -> PRE-LIVE |
-| `exitRoom()` | Full teardown, release camera |
+| `enterByRoomCode(code, displayName?)` | Enter room → PRE-LIVE (displayName optional, updates member name) |
+| `startLive()` | Connect WebRTC → LIVE |
+| `stopLive()` | Disconnect WebRTC → PRE-LIVE |
+| `exitRoom()` | Full teardown, release camera/mic — stay logged in |
+| `backToList()` | Stop media and clear channel — return to room selection without logout |
 | `toggleAudio()` | Start/stop mic hardware |
 | `toggleVideo()` | Start/stop camera hardware |
 | `toggleScreenshare()` | Start/stop screen share |
@@ -810,7 +1019,7 @@ A working app in under 50 lines of JavaScript:
 | `user` | Object | Current user |
 | `memberId` | string | Your member ID |
 | `roomCode` | string | Shareable room code |
-| `channel` | Object | Current channel |
+| `channel` | Object | Current channel: `{ id, room_code, title, description, memberCount }` |
 | `mediaState` | Object | `{ audio, video, audioMuted, videoMuted }` |
 | `screenState` | Object | `{ video, videoMuted }` |
 | `hasMedia` | boolean | Any local media active? |
@@ -823,7 +1032,7 @@ A working app in under 50 lines of JavaScript:
 | `login` | `(user)` | Logged in |
 | `loginError` | `(error)` | Login failed |
 | `logout` | `()` | Logged out |
-| `channelSelected` | `(channel)` | Entered a room (PRE-LIVE) |
+| `channelSelected` | `(channel)` | Entered a room (PRE-LIVE). `channel`: `{ id, room_code, title, description, memberCount }` |
 | `localJoined` | `()` | You went LIVE |
 | `localLeft` | `()` | You returned to PRE-LIVE |
 | `remoteJoined` | `(memberId)` | Remote member went LIVE |
@@ -845,9 +1054,16 @@ A working app in under 50 lines of JavaScript:
 
 3. **Forgetting `startLive()`** — `enterByRoomCode()` only puts you in PRE-LIVE. You must call `startLive()` to connect WebRTC and start sending/receiving media.
 
+   PRE-LIVE is intentional, not just a waiting room. In PRE-LIVE, the local camera and mic work normally — you can call `toggleVideo()` and `toggleAudio()` and the user will see their own preview. Nothing is transmitted to others yet. This is the "green room": users adjust their setup privately before going live.
+
+   Common mistakes stemming from misunderstanding PRE-LIVE:
+   - Calling `startLive()` immediately inside `channelSelected` — this skips the green room and connects WebRTC before the user is ready.
+   - Expecting remote tiles to appear in PRE-LIVE — remote streams don't arrive until you call `startLive()`.
+   - Being surprised that `toggleVideo()` works in PRE-LIVE but nobody else can see you — correct behaviour, by design.
+
 4. **Creating video elements too late (Element-First Rule)** — Register elements *before* streams arrive. If you create a `<video>` element in `localMediaChange`, the stream is already lost.
 
-   **CRITICAL for screenshare:** The screenshare `<video>` element must exist and be registered with `setLocalScreen()` BEFORE calling `toggleScreenshare()`. Create both camera and screenshare tiles in `channelSelected`, with the screenshare tile hidden (`display: none`).
+   **⚠️ CRITICAL for screenshare:** The screenshare `<video>` element must exist and be registered with `setLocalScreen()` BEFORE calling `toggleScreenshare()`. Create both camera and screenshare tiles in `channelSelected`, with the screenshare tile hidden (`display: none`).
 
 5. **Not creating tiles on demand in `remoteStreamStart`** — Stream events can arrive before `remoteJoined`. Always check if the tile exists and create it if needed.
 
@@ -869,7 +1085,7 @@ A working app in under 50 lines of JavaScript:
        const member = MiniChat.getMember(memberId);
        if (memberId === MiniChat.memberId) {
            // Update YOUR controls based on status
-           if (member.displayStatus === 'LIVE') {
+           if (member.displayStatus === 'ACTIVE') {
                startBtn.disabled = true;
                stopBtn.disabled = false;
            } else if (member.displayStatus === 'PRE-LIVE') {
@@ -882,33 +1098,37 @@ A working app in under 50 lines of JavaScript:
    });
    ```
 
+13. **Not removing the local screenshare tile when sharing stops** — In `localMediaChange`, when `screen.video` is false, the screenshare tile must be **removed entirely** (`tile.remove()`), not just hidden. When toggling screenshare back on, `toggleLiveScreen()` re-creates the tile if needed before calling `toggleScreenshare()`. When the tile is shown (screen active), remember to toggle both `display` and the video/placeholder visibility classes.
+
+14. **Not calling `updateGridLayout()` after tile changes** — Any operation that adds, removes, or shows/hides a tile must call `updateGridLayout()` afterward. This function recalculates whether the grid should be in normal mode (grid-N classes) or presentation mode (screenshare/spotlight active), and restructures the DOM accordingly.
+
 ---
 
-*MiniChat API v0.6 — Facade over MiniChatCore. For advanced use, access `MiniChat.core` for the full MiniChatCore API.*
+*MiniChat API v1.0 — Facade over MiniChatCore. For advanced use, access `MiniChat.core` for the full MiniChatCore API.*
 
 ---
+
 ---
 
-# Part 2: Design Guide
+# Part 2 — Design Guide
 
-**Visual, interaction, and layout rules for MiniChat-based apps**
-
-Version 2.0 | February 9, 2026
+Version: 2.3
+Last updated: 2026-02-19
 
 ---
 
 ## Authority & Scope
 
-This section defines **visual, interaction, and layout rules** for MiniChatCore-based apps.
+This document defines **visual, interaction, and layout rules** for MiniChatCore-based apps.
 
 ### Authority Rule (Important)
 
 When behavior or lifecycle rules conflict:
 
-- **Part 1 (API Guide) defines system behavior and lifecycle semantics**
-- **Part 2 (Design Guide) defines visual presentation and interaction rules**
+- **MINI_GUIDE defines system behavior and lifecycle semantics**
+- **DESIGN_GUIDE defines visual presentation and interaction rules**
 
-Design rules must not override MiniChatCore lifecycle behavior.
+DESIGN_GUIDE must not override MiniChatCore lifecycle behavior.
 
 ---
 
@@ -917,7 +1137,7 @@ Design rules must not override MiniChatCore lifecycle behavior.
 This guide follows the MiniChatCore lifecycle exactly:
 
 ```
-PRE-LIVE -> LIVE -> PRE-LIVE / EXIT
+PRE-LIVE → LIVE → PRE-LIVE / EXIT
 ```
 
 ### State Definitions
@@ -1011,25 +1231,25 @@ Use **two separated cards**:
 #### Card Structure
 
 ```
-+-----------------------------+
-|  Name Card                  |
-|  +-----------------------+  |
-|  | Your name             |  |
-|  | [___________________] |  |
-|  +-----------------------+  |
-+-----------------------------+
+┌─────────────────────────────┐
+│  Name Card                  │
+│  ┌───────────────────────┐  │
+│  │ Your name             │  │
+│  │ [___________________] │  │
+│  └───────────────────────┘  │
+└─────────────────────────────┘
 
-+-----------------------------+
-|  Action Card                |
-|                             |
-|  [ + Start a Room ] (primary)|
-|                             |
-|  ---------- OR ----------   |
-|                             |
-|  Join with room code        |
-|  [_________] [ Join ]       |
-|                             |
-+-----------------------------+
+┌─────────────────────────────┐
+│  Action Card                │
+│                             │
+│  [ + Start a Room ] (primary)│
+│                             │
+│  ────────── OR ──────────   │
+│                             │
+│  Join with room code        │
+│  [_________] [ Join ]       │
+│                             │
+└─────────────────────────────┘
 ```
 
 - **Name card**: Label + text input (max 24 chars), **autofocus on load** — typing your name is the default CTA
@@ -1053,19 +1273,19 @@ Use **two separated cards**:
 
 #### Button Loading Behavior
 
-- **"Start a Room"** -> shows spinner + "Creating..." while connecting (indicates room creation in progress)
-- **"Join"** -> label stays as **"Join"** while connecting (button is disabled only, no text change)
+- **"Start a Room"** → shows spinner + "Creating..." while connecting (indicates room creation in progress)
+- **"Join"** → label stays as **"Join"** while connecting (button is disabled only, no text change)
 
 #### Dynamic Button Priority
 
-- **No room code entered** -> "Start a Room" = primary (accent color), "Join" = secondary
-- **Room code entered** -> "Join" = primary (accent color), "Start a Room" = secondary
+- **No room code entered** → "Start a Room" = primary (accent color), "Join" = secondary
+- **Room code entered** → "Join" = primary (accent color), "Start a Room" = secondary
 - This guides users naturally toward the most relevant action
 
 #### URL Deep Linking (`?code=`)
 
 - Auto-fill room code from URL parameter
-- Triggers dynamic priority swap -> "Join" becomes primary
+- Triggers dynamic priority swap → "Join" becomes primary
 
 #### Shareable Invite Link
 
@@ -1090,7 +1310,7 @@ Rules:
 - **Go Live / Enter Room** is primary CTA, placed in an action row below controls
 - **Back button** sits alongside "Go Live" in the same row — secondary styling (soft background, border), navigates back to the entry screen, exits the channel, and releases camera/mic preview
 - No other participants visible
-- Camera off -> initials placeholder (stable tile size)
+- Camera off → initials placeholder (stable tile size)
 - **No drag/resize handles** — tile interaction controls (drag handle, resize handle) are hidden in pre-live; they only appear on live room tiles
 
 ---
@@ -1107,14 +1327,14 @@ Each **camera tile** contains:
 
 Tiles never contain controls.
 
-> **Screen share tiles** are an exception — they show a name label but no indicators or badges. See [Screen Share Tile Semantics](#screen-share-tile-semantics).
+> **Screen share tiles** are an exception — they show a name label and LIVE badge, but no mic/camera indicators. See [Screen Share Tile Semantics](#screen-share-tile-semantics).
 
 ### Initials Placeholder
 
 When camera is off, show initials inside the placeholder:
-- **Single name** (e.g. "April") -> first letter only -> **A**
-- **Two or more names** (e.g. "April Kim") -> first letter of first + last name -> **AK**
-- Empty/missing name -> **?**
+- **Single name** (e.g. "April") → first letter only → **A**
+- **Two or more names** (e.g. "April Kim") → first letter of first + last name → **AK**
+- Empty/missing name → **?**
 
 ### Tile Sizing (Non-Negotiable)
 
@@ -1130,8 +1350,8 @@ When camera is off, show initials inside the placeholder:
 - **No emoji characters** — all icons must be inline SVG or icon font. Emoji rendering is inconsistent across platforms and does not meet design quality standards.
 
 Indicator visibility must be **immediately obvious** at any tile size:
-- ON -> `--accent` icon color + accent-tinted background pill (`rgba(accent, .25)`)
-- OFF -> `--dangerText` icon color + danger-tinted background pill (`rgba(danger, .25)`)
+- ON → `--accent` icon color + accent-tinted background pill (`rgba(accent, .25)`)
+- OFF → `--dangerText` icon color + danger-tinted background pill (`rgba(danger, .25)`)
 - **On video tiles** (inside `.member-info`): indicators use **higher opacity backgrounds** (`rgba(accent, .7)` / `rgba(danger, .7)`) with white icon color to ensure visibility against any video content
 - Do NOT rely on opacity alone to distinguish states — opacity differences are too subtle on dark backgrounds and at small sizes
 
@@ -1141,142 +1361,395 @@ Indicator visibility must be **immediately obvious** at any tile size:
 
 - Create tile on room entry or member visibility
 - **Remote tiles appear when the participant is LIVE or PRE-LIVE** — both active and pre-live members are visible to others
-- **Do NOT remove camera tiles** on LIVE -> PRE-LIVE — they may rejoin
+- **Do NOT remove camera tiles** on LIVE → PRE-LIVE — they may rejoin
 - **Screenshare tiles are ephemeral** — remove entirely when sharing stops (`remoteStreamEnd` for screenshare)
 - Remove camera tiles only when displayStatus = **INACTIVE** or explicit exit
 
 ---
 
-## Screen Share (Presentation Mode)
+## Screen Share & Presentation Mode
+
+### How Presentation Mode Works
+
+TinyRoom uses a **single `#videoGrid`** container that dynamically switches between normal grid mode and presentation mode. There is no separate `#screenshareGrid`. When a screenshare or spotlight is active, `updateGridLayout()` restructures the grid:
+
+1. The grid gets the `presentation` CSS class
+2. A `.screenshare-area` div is dynamically created (prepended to grid) — this is the **featured row**
+3. A `.camera-strip` div is dynamically created (appended to grid) — this is the **thumbnail row**
+4. Screenshare tiles and spotlighted camera tiles are moved into `.screenshare-area`
+5. Remaining camera tiles are moved into `.camera-strip`
+
+When screenshare/spotlight ends, the containers are removed and tiles are restored to the normal grid.
+
+```css
+/* Presentation mode: two-row layout */
+#videoGrid.presentation {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;    /* Featured area fills space, strip auto-sizes */
+    place-items: center;
+    transition: grid-template-rows 0.3s ease;
+}
+```
 
 ### Screen Share Priority
 
 - Multiple participants may share their screen simultaneously
-- All active screen shares are displayed **side by side** in the screenshare area
-- On mobile (narrow viewports), multiple screenshares **stack vertically**
-- Screen shares always occupy the primary visual surface above camera tiles
+- All active screen shares are displayed **side by side** in the `.screenshare-area`
+- On mobile (narrow viewports), multiple screenshares **stack vertically** (`flex-direction: column`)
+- Screen shares always occupy the primary visual surface (row 1 of the presentation grid)
 
-### Screen Share Layout Rules
+### Featured Area (`.screenshare-area`)
 
-- Each screen share creates a **separate tile** inside a shared `.screenshare-area` container
-- Camera tiles always remain visible in the strip below
-- Screen share tiles divide the available area equally (flexbox `flex: 1`)
-- Each screen share must preserve its native aspect ratio
-- Letterboxing is preferred over cropping
-- Screen share tiles must never be visually smaller than participant camera tiles
+The featured area holds screenshare tiles and spotlighted camera tiles:
 
-### Participant Camera Strip
+```css
+.screenshare-area {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
 
-- Participant camera tiles are placed in a horizontal strip
-- Default position: bottom
-- Tiles are equal size
-- Strip must not obscure critical screen content
-- Strip may scroll horizontally if space is limited
+.screenshare-area .video-tile {
+    flex: 1;
+    min-width: 0;
+    max-width: min(100%, calc((100vh - 220px) * 16 / 9));
+    max-height: 100%;
+}
+```
+
+- Tiles divide the area equally (`flex: 1`)
+- Each tile is constrained by `max-width: min(100%, calc((100vh - 220px) * 16/9))` — the 220px accounts for controls bar + camera strip + padding
+- Screenshare video uses `object-fit: contain` with black letterboxing — content is never cropped
+- **Member-info is hidden** on screenshare tiles in the featured area (`.screenshare-area .video-tile .member-info { display: none }`)
+- Spotlighted camera tiles in the featured area keep `object-fit: cover` and their member-info visible
+
+### Camera Strip (`.camera-strip`)
+
+```css
+.camera-strip {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 0 0;
+    overflow-x: auto;
+    width: 100%;
+}
+
+.camera-strip .video-tile {
+    flex: 0 0 180px;    /* Fixed 180px thumbnails on desktop */
+    width: 180px;
+}
+```
+
+- Camera tiles are fixed-width thumbnails (180px desktop, 120px mobile)
+- Strip scrolls horizontally when there are many participants
+- Strip sits in row 2 of the presentation grid, below the featured area
 
 ### Screen Share Tile Semantics
 
-- Screen share tiles:
-  - Show a **name label** identifying whose screen is being shared (e.g. "April's Screen", "Your Screen")
-  - Do NOT show mic/camera indicators
-  - Do NOT show LIVE badges
-- Screen share is content with ownership attribution
+- Screen share tiles in the featured area:
+  - **Member-info is hidden** — no name label, indicators, or badges visible
+  - The placeholder shows "Your Screen" / "Name's Screen" when video is not active
+- Screen share is content — the visual focus is on what's being shared, not who's sharing
 
 ### Screen Share Transitions
 
-- Entering or exiting screen share must use a smooth layout transition
-- Avoid sudden jumps or full reflow
-- Participant tile positions should remain stable where possible
+- Entering or exiting presentation mode uses smooth CSS transitions on `grid-template-rows`
+- `updateGridLayout()` moves tiles via `appendChild()` — DOM elements are moved, not recreated
+- Tile positions remain stable within the camera strip
+
+### Local Screenshare Lifecycle
+
+When the local user stops screen sharing, the screenshare tile is **removed entirely** from the DOM (not just hidden). This is different from camera tiles which persist:
+
+```javascript
+// In localMediaChange handler:
+if (screen.video) {
+    screenTile.style.display = 'flex';
+    screenTile.querySelector('.video-placeholder')?.classList.add('hidden');
+    screenTile.querySelector('video')?.classList.add('visible');
+} else {
+    screenTile.remove();   // Removed entirely, not hidden
+}
+```
+
+When toggling screenshare on again, `toggleLiveScreen()` checks if the tile exists and re-creates it if needed before calling `toggleScreenshare()`.
 
 Known SDK limitation: local self screenshare preview may appear black.
 
 ---
 
+## Spotlight
+
+Spotlight allows a camera tile to be promoted to the featured area alongside screenshare tiles, giving that participant visual prominence.
+
+### Behavior
+
+- Clicking the spotlight button on a camera tile toggles it into/out of the `.screenshare-area`
+- Only **one** camera tile can be spotlighted at a time — spotlighting a new tile removes the previous spotlight
+- Spotlighted tiles trigger presentation mode (same as screenshare) via `updateGridLayout()`
+- When spotlight is removed and no screenshare is active, the grid returns to normal mode
+
+### Visual Treatment
+
+```css
+/* Accent border on spotlighted tile */
+.video-tile.tile-spotlighted {
+    border: 2px solid var(--accent);
+}
+
+/* Spotlighted camera keeps cover fit and member-info (unlike screenshare) */
+.screenshare-area .video-tile.tile-spotlighted .video-container video {
+    object-fit: cover;
+    background: var(--soft);
+}
+
+.screenshare-area .video-tile.tile-spotlighted .member-info {
+    display: flex;
+}
+```
+
+### Spotlight Button
+
+- Appears in `.tile-actions` on camera tiles (hover-reveal)
+- Icon toggles between expand (maximize arrows) and minimize (inward arrows)
+- Button gets accent background when spotlight is active
+
+---
+
+## Tile Interactions (Drag, Resize, Fullscreen)
+
+TinyRoom tiles support drag, resize, and fullscreen — enabling users to customize their view during a live session.
+
+### Drag
+
+- **Drag handle**: top-left corner of each tile, visible on hover
+- Dragging converts the tile to `position: absolute` (`tile-dragged` class) and removes it from the grid flow
+- Dragged tiles are constrained within the `#videoGrid` bounds
+- Dragged tiles persist their position across layout updates (they're excluded from grid reflow)
+
+```css
+.drag-handle {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    cursor: grab;
+}
+
+.video-tile:hover .drag-handle {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.video-tile.tile-dragged {
+    position: absolute;
+    transition: none;
+}
+
+.video-tile.tile-dragging {
+    z-index: 50;
+    opacity: 0.85;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+```
+
+### Resize
+
+- **Resize handle**: bottom-right corner, visible on hover (diagonal lines indicator)
+- Minimum size: 160px × 90px
+- Resized tiles get the `tile-resized` class, which hides the aspect-ratio `::before` spacer
+- Resize is free-form (not locked to 16:9)
+
+```css
+.resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nwse-resize;
+}
+
+.video-tile.tile-resized::before { display: none; }
+```
+
+### Fullscreen
+
+- Screenshare tiles have a **fullscreen button** in `.tile-actions` (top-right, hover-reveal)
+- Uses the browser Fullscreen API (`requestFullscreen`)
+- In fullscreen: border-radius and border are removed, `object-fit: contain` is used, and tile actions auto-hide after 1 second (re-appear on hover)
+
+### Reset Layout
+
+A **"Reset Layout"** button becomes visible when any tile has been dragged or resized. Clicking it:
+- Removes `tile-dragged` and `tile-resized` classes from all tiles
+- Clears all inline positioning styles (top, left, bottom, right, width)
+- Removes all spotlight states
+- Calls `updateGridLayout()` to restore the normal grid
+
+### Pre-Live Restriction
+
+- Drag handles, resize handles, and tile-actions are **hidden in pre-live** — they only appear on live room tiles
+
+---
+
 ## Tile Layout Decision Model (Authoritative)
 
-Tile layout selection must follow these steps **in order**.
-Do not jump directly from tile count to grid.
+### How Layout Works
 
-### Step 1: Determine Context
+TinyRoom uses a **CSS class-based grid system**. The `updateGridLayout()` function counts visible tiles and applies a `grid-N` class (where N = 1–8) to `#videoGrid`. Each class defines the appropriate `grid-template-columns`.
 
-Inputs:
-- Visible tile count (exclude hidden / `display: none` tiles)
-- Viewport width, height, and aspect ratio
-- Screen type: desktop or mobile
+When screenshare or spotlight is active, the grid switches to **presentation mode** instead (see [Screen Share & Presentation Mode](#screen-share--presentation-mode)).
 
-### Step 2: Preserve Aspect Ratio (Hard Rule)
+### Layout Update Flow
 
-- All tiles must preserve **16:9**
+1. Count visible tiles (exclude `display: none` and dragged tiles)
+2. Check for screenshare or spotlight presence
+3. If screenshare/spotlight → apply `presentation` class (featured area + camera strip)
+4. Otherwise → apply `grid-N` class based on visible tile count (capped at 8)
+
+```javascript
+function updateGridLayout() {
+    const grid = document.getElementById('videoGrid');
+    const allTiles = Array.from(grid.querySelectorAll('.video-tile')).filter(
+        c => c.style.display !== 'none'
+    );
+    const hasScreenshare = allTiles.some(c => c.dataset.streamType === 'screenshare');
+    const hasSpotlight = allTiles.some(c => c.classList.contains('tile-spotlighted'));
+
+    grid.className = '';
+
+    if (hasScreenshare || hasSpotlight) {
+        // Presentation mode — see Screen Share section
+    } else {
+        // Normal grid mode
+        const gridCount = allVisible.filter(c => !c.classList.contains('tile-dragged')).length;
+        if (gridCount > 0) grid.classList.add(`grid-${Math.min(gridCount, 8)}`);
+    }
+}
+```
+
+### Aspect Ratio (Hard Rule)
+
+- All tiles preserve **16:9** via `::before { padding-top: 56.25% }`
 - Cropping is allowed only as a last resort
 - Letterboxing is preferred over distortion
 - **Distortion is never allowed**
 
-### Step 3: Choose Row-Based Layout First
-
-Before using multi-row grids, attempt:
-- Single-row layouts for 1-3 participants (desktop)
-- Balanced row splits for odd counts (e.g. 3+2, 4+3)
-
-### Step 4: Center the Group
-
-- The entire tile group must be **visually centered**
-- Empty space must be distributed symmetrically
-- No top-left anchoring
-
-### Step 5: Expand to Grid Only When Necessary
-
-Use multi-row grids only when:
-- A single row would reduce tiles below a comfortable size
-- Or the viewport aspect ratio makes rows impractical
-
-Tiles must always attempt to maximize usable screen space **without violating aspect ratio or visual balance**.
-
-A layout that fills more space but feels cramped or uneven is considered incorrect.
-
 ### Space-Maximizing Principle
 
-Single-participant and pre-live tiles must **fill the available viewport**, not use small fixed widths. Size the tile based on viewport height to maintain 16:9 without overflow:
+Single-participant and pre-live tiles **fill the available viewport**, not use small fixed widths:
 
 ```css
-/* Example: solo tile fills available space */
-width: min(100%, calc((100vh - chrome_offset) * 16 / 9));
+#videoGrid.grid-1 .video-tile {
+    width: min(100%, calc((100vh - 140px) * 16 / 9));
+}
 ```
 
-Where `chrome_offset` accounts for topbar, controls bar, and padding. This ensures the tile is as large as possible regardless of screen size, and adapts correctly when the window resizes.
+The 140px offset accounts for topbar + controls bar + padding. The tile is as large as possible while maintaining 16:9 without overflow.
 
-### Preferred Desktop Row Patterns
+### Grid CSS Classes (Desktop)
 
-| Tile Count | Preferred Layout |
-|-----------:|------------------|
-| 1 | Single tile, centered |
-| 2 | 1 row x 2 |
-| 3 | 1 row x 3 (fallback: 2 + 1 centered) |
-| 4 | 2 x 2 |
-| 5 | 3 + 2 (centered) |
-| 6 | 3 x 2 |
-| 7 | 4 + 3 |
-| 8 | 4 x 2 |
+```css
+/* 1 tile: centered, viewport-filling */
+#videoGrid.grid-1 { grid-template-columns: 1fr; place-items: center; }
+#videoGrid.grid-1 .video-tile { width: min(100%, calc((100vh - 140px) * 16 / 9)); }
 
-Notes:
-- Row splits must be centered as a group
-- Avoid single orphan tiles on their own row
+/* 2 tiles: side by side */
+#videoGrid.grid-2 { grid-template-columns: 1fr 1fr; }
+
+/* 3 tiles: single row */
+#videoGrid.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* 4 tiles: 2×2 */
+#videoGrid.grid-4 { grid-template-columns: 1fr 1fr; }
+
+/* 5 tiles: 3+2 centered — 6-column sub-grid trick */
+#videoGrid.grid-5 { grid-template-columns: repeat(6, 1fr); }
+#videoGrid.grid-5 .video-tile { grid-column: span 2; }
+#videoGrid.grid-5 .video-tile:nth-child(4) { grid-column: 2 / span 2; }
+
+/* 6 tiles: 3×2 */
+#videoGrid.grid-6 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* 7 tiles: 4+3 centered — 8-column sub-grid trick */
+#videoGrid.grid-7 { grid-template-columns: repeat(8, 1fr); }
+#videoGrid.grid-7 .video-tile { grid-column: span 2; }
+#videoGrid.grid-7 .video-tile:nth-child(5) { grid-column: 2 / span 2; }
+
+/* 8 tiles: 4×2 */
+#videoGrid.grid-8 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+```
+
+**How the sub-grid centering works (5 and 7 tiles):**
+- For 5 tiles: a 6-column grid is used. Each tile spans 2 columns. Row 1 has tiles at columns 1-2, 3-4, 5-6. Row 2's first tile starts at column 2 (spanning 2-3), automatically centering the bottom row.
+- For 7 tiles: same principle with 8 columns and the 5th tile offset to column 2.
+
+### Summary Table
+
+| Tile Count | Layout | CSS Class | Centering Method |
+|-----------:|--------|-----------|-----------------|
+| 1 | Single tile, centered, viewport-filling | `grid-1` | `place-items: center` |
+| 2 | 1 row × 2 | `grid-2` | `1fr 1fr` |
+| 3 | 1 row × 3 | `grid-3` | `1fr 1fr 1fr` |
+| 4 | 2 × 2 | `grid-4` | `1fr 1fr` |
+| 5 | 3 + 2 (centered) | `grid-5` | 6-col sub-grid |
+| 6 | 3 × 2 | `grid-6` | `1fr 1fr 1fr` |
+| 7 | 4 + 3 (centered) | `grid-7` | 8-col sub-grid |
+| 8 | 4 × 2 | `grid-8` | `1fr 1fr 1fr 1fr` |
 
 ### Three-Participant Layout Rule
 
 Default behavior (desktop):
-- Use a single-row layout (1 x 3)
+- Use a single-row layout (1 × 3)
 - All tiles equal size
 - Group centered
 
-Fallback behavior:
-- A 2 + 1 layout is permitted only when a single-row layout would reduce tiles below minimum readable size
-- Fallback must preserve visual balance and must not imply hierarchy
-- The single tile must be horizontally centered beneath the top row
+Fallback behavior (tablet: 641px–768px):
+- A 2 + 1 centered layout is used when viewport is too narrow for 3-across
+- Uses the same sub-grid centering trick: `repeat(4, 1fr)` with tiles spanning 2 columns, 3rd tile offset to `grid-column: 2 / span 2`
+
+```css
+@media (min-width: 641px) and (max-width: 768px) {
+    #videoGrid.grid-3 { grid-template-columns: repeat(4, 1fr); }
+    #videoGrid.grid-3 .video-tile { grid-column: span 2; }
+    #videoGrid.grid-3 .video-tile:nth-child(3) { grid-column: 2 / span 2; }
+}
+```
 
 ### Mobile (<=640px)
 
-- 2-3: vertical stack
-- 4+: 2-column grid
-- Remove column spanning
+```css
+@media (max-width: 640px) {
+    #videoGrid.grid-2 { grid-template-columns: 1fr; }          /* Stack */
+    #videoGrid.grid-3 { grid-template-columns: 1fr; }          /* Stack */
+    #videoGrid.grid-4,
+    #videoGrid.grid-6,
+    #videoGrid.grid-8 { grid-template-columns: 1fr 1fr; }     /* 2-col */
+    #videoGrid.grid-5 { grid-template-columns: 1fr 1fr; }     /* 2-col, reset sub-grid */
+    #videoGrid.grid-5 .video-tile { grid-column: span 1; }
+    #videoGrid.grid-7 { grid-template-columns: 1fr 1fr; }     /* 2-col, reset sub-grid */
+    #videoGrid.grid-7 .video-tile { grid-column: span 1; }
+
+    /* Screenshare stacks vertically */
+    .screenshare-area { flex-direction: column; }
+    .screenshare-area .video-tile { flex: none; width: 100%; }
+
+    /* Camera strip thumbnails shrink */
+    .camera-strip .video-tile { flex: 0 0 120px; width: 120px; }
+}
+```
 
 ### Tile Layout Anti-Patterns (Do Not Implement)
 
@@ -1420,15 +1893,25 @@ Accessibility:
 
 ## Summary
 
-- Part 1 (API Guide) controls behavior
-- Part 2 (Design Guide) controls UI
-- PRE-LIVE is not EXIT
-- Camera tiles persist across LIVE <-> PRE-LIVE; screenshare tiles are ephemeral
-- Media indicators always visible with distinct on/off icons
-- Screen share = separate tile (name label, no indicators/badges)
+- MINI_GUIDE controls behavior
+- DESIGN_GUIDE controls UI
+- PRE-LIVE ≠ EXIT
+- Camera tiles persist across LIVE ⇄ PRE-LIVE; screenshare tiles removed entirely on stream end
 - Remote members visible in both LIVE and PRE-LIVE states
+- Single `#videoGrid` switches between normal grid mode (grid-1 through grid-8) and presentation mode
+- Presentation mode: `.screenshare-area` (featured) + `.camera-strip` (thumbnails) created dynamically
+- Spotlight promotes a camera tile to the featured area alongside screenshare tiles
+- Tile interactions: drag, resize, fullscreen, spotlight — all hover-reveal, live room only
+- Media indicators always visible
+- Screen share = separate tile in the featured area, member-info hidden
 - Calm, human-first design
 
 ---
 
-*End of VibeLive Integration Guide v1.0*
+End of DESIGN_GUIDE_v2.3
+
+---
+
+---
+
+*VibeLive Integration Guide — MiniChat API v0.63 + Design Guide v2.3 | Last updated: 2026-02-19*

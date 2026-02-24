@@ -1621,6 +1621,7 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     tile.id = tileId;
     tile.dataset.memberId = memberId;
     tile.dataset.streamType = streamType;
+    tile.dataset.isLocal = isLocal ? 'true' : 'false';
 
     const videoContainer = document.createElement('div');
     videoContainer.className = 'video-container';
@@ -2074,7 +2075,7 @@ function updateMemberIndicators(memberId, streamType) {
                 }
             } else {
                 const m = MiniChat.getMember(memberId);
-                if (m?.displayStatus === 'ACTIVE') {
+                if (m?.displayStatus === 'LIVE') {
                     badge.classList.add('live');
                     badge.textContent = 'LIVE';
                 }
@@ -2119,8 +2120,8 @@ MiniChat.on('channelSelected', async (channel) => {
         }
     }
 
-    MiniChat.toggleVideo();
-    MiniChat.toggleAudio();
+    await MiniChat.toggleVideo();
+    await MiniChat.toggleAudio();
 });
 
 MiniChat.on('localJoined', async () => {
@@ -2134,7 +2135,7 @@ MiniChat.on('localJoined', async () => {
     const members = await MiniChat.getMembers();
     members.forEach(m => {
         if (m.id === MiniChat.memberId) return;
-        if (m.displayStatus === 'ACTIVE') {
+        if (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE') {
             const tile = createVideoTile(m.id, m.displayName, 'camera', false);
             if (tile) document.getElementById('videoGrid').appendChild(tile);
         }
@@ -2165,7 +2166,6 @@ MiniChat.on('localLeft', () => {
 MiniChat.on('remoteJoined', (memberId) => {
     if (!MiniChat.isLive) return;
     const m = MiniChat.getMember(memberId);
-    if (m?.displayStatus !== 'ACTIVE') return;
     const tile = createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
     if (tile) document.getElementById('videoGrid').appendChild(tile);
     updateGridLayout();
@@ -2173,7 +2173,7 @@ MiniChat.on('remoteJoined', (memberId) => {
 
 MiniChat.on('remoteLeft', (memberId) => {
     const m = MiniChat.getMember(memberId);
-    if (m?.displayStatus === 'INACTIVE') {
+    if (m?.displayStatus === 'EXITED') {
         document.getElementById(`tile-${memberId}-camera`)?.remove();
         document.getElementById(`tile-${memberId}-screenshare`)?.remove();
         updateGridLayout();
@@ -2181,6 +2181,14 @@ MiniChat.on('remoteLeft', (memberId) => {
 });
 
 MiniChat.on('memberUpdate', (memberId) => {
+    const member = MiniChat.getMember(memberId);
+    if (!member) return;
+
+    // Update self controls when own status changes
+    if (memberId === MiniChat.memberId) {
+        updateLocalControlUI();
+    }
+
     updateMemberIndicators(memberId);
 });
 
@@ -2284,13 +2292,8 @@ MiniChat.on('localMediaChange', () => {
             screenTile.querySelector('.video-placeholder')?.classList.add('hidden');
             screenTile.querySelector('video')?.classList.add('visible');
         } else {
-            screenTile.remove();
+            screenTile.style.display = 'none';
         }
-    }
-
-    // Safety: remove any orphaned screenshare tiles when not sharing
-    if (!screen.video) {
-        document.querySelectorAll(`.video-tile[data-member-id="${MiniChat.memberId}"][data-stream-type="screenshare"]`).forEach(t => t.remove());
     }
 
     updateGridLayout();

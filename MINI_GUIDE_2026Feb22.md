@@ -2,17 +2,23 @@
 
 **Build an anonymous video chat app with MiniChat**
 
-Version 0.6 | February 15, 2026
+Version 0.65 | February 22, 2026
+
+Works with vanilla JS, React, Vue, or any framework. See [Using MiniChat with React](#using-minichat-with-react) for React-specific patterns.
 
 ---
 
 ## Setup
 
-Import and initialize MiniChat:
+There are two ways to load MiniChat depending on your workflow.
+
+### Option A — Source Module (development / frameworks)
+
+Import directly from the source file, which has `export default`:
 
 ```html
 <script type="module">
-    import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js';
+    import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/minichat-api.js';
 
     MiniChat.init({
         contextId: 'YOUR_CONTEXT_ID',
@@ -24,24 +30,51 @@ Import and initialize MiniChat:
     MiniChat.on('remoteStreamStart', (memberId, streamType) => { /* ... */ });
 </script>
 
-<!-- onclick handlers just work â€” no window.xxx workaround needed -->
+<!-- onclick handlers just work — MiniChat is also on window automatically -->
 <button onclick="MiniChat.signup('Alex')">Join</button>
 <button onclick="MiniChat.startLive()">Go Live</button>
 ```
 
-> **ðŸ§ª Test Credentials**: Use `contextId: 'Kw6w6w6w6w'` and `contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB'` for quick testing.
+### Option B — Pre-built Bundle (production / plain HTML)
 
-`MiniChat` is automatically available on `window` â€” all methods work directly in `onclick` handlers without any extra wiring.
+Load `makedo-vibelive.min.js` with a plain `<script>` tag. No `import`, no module setup:
+
+```html
+<!-- Load the bundle — puts MiniChat on window immediately -->
+<script src="https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js"></script>
+
+<script>
+    MiniChat.init({
+        contextId: 'YOUR_CONTEXT_ID',
+        contextAuthToken: 'YOUR_CONTEXT_TOKEN'
+    });
+
+    MiniChat.on('channelSelected', (channel) => { /* ... */ });
+    MiniChat.on('remoteStreamStart', (memberId, streamType) => { /* ... */ });
+</script>
+
+<!-- onclick handlers work the same way -->
+<button onclick="MiniChat.signup('Alex')">Join</button>
+<button onclick="MiniChat.startLive()">Go Live</button>
+```
+
+The bundle is a single self-contained file — no import maps, no `type="module"`, no build tools required. This is the simplest integration for plain HTML pages or CMS environments.
+
+> **⚠️ Don't mix them**: Do not `import MiniChat from 'makedo-vibelive.min.js'` — the bundle is IIFE format and has no `export default`. Use Option A (`minichat-api.js`) for module imports, or Option B (`makedo-vibelive.min.js`) with a plain `<script>` tag.
+
+> **🧪 Test Credentials**: Use `contextId: 'Kw6w6w6w6w'` and `contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB'` for quick testing.
+
+`MiniChat` is automatically available on `window` in both options — all methods work directly in `onclick` handlers without any extra wiring. The `onclick` style is fine for demos and quick prototypes, but for real apps use `addEventListener` — it supports `async/await`, proper error handling, and keeps logic out of HTML attributes.
 
 ---
 
 ## User Flow
 
-Anonymous users have two paths â€” **create** or **join** a room:
+Anonymous users have two paths — **create** or **join** a room:
 
 ```
-signup(name) â†’ createRoom(title) â†’ enterByRoomCode(code) â†’ startLive()
-signup(name) â†’ enterByRoomCode(code) â†’ startLive()
+signup(name) → createRoom(title) → enterByRoomCode(code) → startLive()
+signup(name) → enterByRoomCode(code) → startLive()
 ```
 
 ### Create a Room
@@ -51,7 +84,7 @@ await MiniChat.signup('Alex');
 const room = await MiniChat.createRoom("Alex's Room");
 // room.room_code is the shareable code (e.g., "X7kQ3m")
 await MiniChat.enterByRoomCode(room.room_code);
-// Now in PRE-LIVE â€” call startLive() when ready
+// Now in PRE-LIVE — call startLive() when ready
 ```
 
 ### Join a Room
@@ -59,7 +92,7 @@ await MiniChat.enterByRoomCode(room.room_code);
 ```javascript
 await MiniChat.signup('Jordan');
 await MiniChat.enterByRoomCode('X7kQ3m');
-// Now in PRE-LIVE â€” call startLive() when ready
+// Now in PRE-LIVE — call startLive() when ready
 ```
 
 ### Change Display Name on Rejoin
@@ -81,10 +114,10 @@ await MiniChat.enterByRoomCode('X7kQ3m', 'NewName');
 
 ---
 
-## Member Lifecycle: PRE-LIVE â†’ LIVE â†’ EXIT
+## Member Lifecycle: PRE-LIVE → LIVE → EXIT
 
 ```
-PRE-LIVE    â†’    LIVE    â†’    PRE-LIVE or EXIT
+PRE-LIVE    →    LIVE    →    PRE-LIVE or EXIT
 (preparing)      (streaming)   (back or gone)
 ```
 
@@ -95,9 +128,10 @@ PRE-LIVE    â†’    LIVE    â†’    PRE-LIVE or EXIT
 | **PRE-LIVE** | WebRTC disconnected, still in channel | `stopLive()` |
 | **EXIT** | Fully departed, camera released | `exitRoom()` |
 
-- `startLive()` â€” Connect WebRTC, go LIVE
-- `stopLive()` â€” Disconnect WebRTC, return to PRE-LIVE (quick rejoin possible)
-- `exitRoom()` â€” Full teardown, release camera/mic
+- `startLive()` — Connect WebRTC, go LIVE
+- `stopLive()` — Disconnect WebRTC, return to PRE-LIVE (quick rejoin possible)
+- `exitRoom()` — Full teardown, release camera/mic, stay logged in (can enter a different room)
+- `logout()` — Full session teardown including authentication
 
 ---
 
@@ -105,14 +139,14 @@ PRE-LIVE    â†’    LIVE    â†’    PRE-LIVE or EXIT
 
 ### Toggle vs Mute
 
-Two different concepts â€” understand the difference:
+Two different concepts — understand the difference:
 
 | Action | What Happens | Camera Light | Others See |
 |--------|--------------|--------------|------------|
 | `toggleVideo()` | Start/stop capture | On/Off | Video appears/disappears |
 | `toggleMuteVideo()` | Hide while capturing | Stays On | Black frame |
-| `toggleAudio()` | Start/stop microphone | â€” | Audio appears/disappears |
-| `toggleMuteAudio()` | Silence while capturing | â€” | Silence |
+| `toggleAudio()` | Start/stop microphone | — | Audio appears/disappears |
+| `toggleMuteAudio()` | Silence while capturing | — | Silence |
 
 `toggleScreenshare()` starts/stops screen sharing.
 
@@ -124,18 +158,22 @@ Two different concepts â€” understand the difference:
 
 **Microphone button:** Use `toggleMuteAudio()` (after initial `toggleAudio()` to start capture)
 - Users expect instant unmute (common in meetings)
-- Keeps microphone warm â€” no permission prompt when unmuting
+- Keeps microphone warm — no permission prompt when unmuting
 
 **Example:**
 ```javascript
-// On room entry: start both
-await MiniChat.startLive();
+// On room entry: connect WebRTC first
+await MiniChat.startLive();          // WebRTC only — does NOT start audio or video
+
+// Then start capture (startLive does not do this automatically)
+await MiniChat.toggleAudio();        // Starts mic — required before toggleMuteAudio() is meaningful
+await MiniChat.toggleVideo();        // Starts camera
 
 // User clicks mic button (during call)
-MiniChat.toggleMuteAudio();  // Mute/unmute â€” instant, no hardware restart
+MiniChat.toggleMuteAudio();         // Mute/unmute — instant, no hardware restart
 
 // User clicks camera button (during call)
-MiniChat.toggleVideo();      // Stop/start â€” hardware light on/off
+MiniChat.toggleVideo();             // Stop/start — hardware light on/off
 ```
 
 Use `toggleMuteVideo()` only for specialized cases (e.g., "hide self while fixing appearance" but keep capturing).
@@ -148,10 +186,10 @@ Screen sharing is typically offered in **LIVE mode only**. In both cases, follow
 
 ```javascript
 MiniChat.mediaState
-// â†’ { audio: true/false, video: true/false, audioMuted: true/false, videoMuted: true/false }
+// → { audio: true/false, video: true/false, audioMuted: true/false, videoMuted: true/false }
 
 MiniChat.screenState
-// â†’ { video: true/false, videoMuted: true/false }
+// → { video: true/false, videoMuted: true/false }
 ```
 
 ### Reading Remote Media State
@@ -170,20 +208,20 @@ There are two separate "worlds" of media state:
 
 | Source | What it reflects | Use for |
 |--------|-----------------|--------|
-| `MiniChat.mediaState` | **Hardware state** â€” is the camera/mic capturing? | Local user's indicators |
-| `MiniChat.getMediaStates(id)` | **WebRTC state** â€” what's being transmitted? | Remote member indicators |
+| `MiniChat.mediaState` | **Hardware state** — is the camera/mic capturing? | Local user's indicators |
+| `MiniChat.getMediaStates(id)` | **WebRTC state** — what's being transmitted? | Remote member indicators |
 
-In **PRE-LIVE**, the local camera can be on (for preview) but nothing is transmitted. This is correct â€” the local indicator reflects what the user cares about: *"Is my camera on?"*
+In **PRE-LIVE**, the local camera can be on (for preview) but nothing is transmitted. This is correct — the local indicator reflects what the user cares about: *"Is my camera on?"*
 
 In **LIVE**, the two states naturally align. No special synchronization logic is needed.
 
-**Always use `MiniChat.mediaState` for the local user's indicators** â€” never `MiniChat.getMediaStates(MiniChat.memberId)`, which reflects WebRTC state and won't be meaningful in PRE-LIVE.
+**Always use `MiniChat.mediaState` for the local user's indicators** — never `MiniChat.getMediaStates(MiniChat.memberId)`, which reflects WebRTC state and won't be meaningful in PRE-LIVE.
 
 ---
 
 ## The Element-First Rule
 
-> **Register video elements before streams arrive, not in response to them.**
+> **For local streams: register video elements before streams arrive, not in response to them.**
 
 When MiniChat creates a media stream, it immediately attaches to whatever `<video>` element you've registered. No element registered = stream silently lost.
 
@@ -194,21 +232,23 @@ When MiniChat creates a media stream, it immediately attaches to whatever `<vide
 | **Remote camera** | Inside `remoteStreamStart` handler | Stream is arriving *right now* |
 | **Remote screenshare** | Inside `remoteStreamStart` handler | Stream is arriving *right now* |
 
+> **Note:** The "before streams arrive" requirement applies only to **local** streams. For remote streams, `remoteStreamStart` is both the signal and the correct registration moment — there is nothing to pre-create.
+
 ```javascript
-// âœ… Register both local elements at tile creation
+// ✅ Register both local elements at tile creation
 MiniChat.setLocalCamera(cameraVideoEl);
 MiniChat.setLocalScreen(screenVideoEl);
 
-// âŒ DON'T create elements in localMediaChange â€” too late!
+// ❌ DON'T create elements in localMediaChange — too late!
 ```
 
-**Why this matters for screenshare:** When you call `toggleScreenshare()`, the stream is produced **instantly**. If you wait until `localMediaChange` fires to create the tile and call `setLocalScreen()`, the stream has already been produced with no element to attach to â€” result: blank screen. The element must exist and be registered **before** the user clicks the screenshare button.
+**Why this matters for screenshare:** When you call `toggleScreenshare()`, the stream is produced **instantly**. If you wait until `localMediaChange` fires to create the tile and call `setLocalScreen()`, the stream has already been produced with no element to attach to — result: blank screen. The element must exist and be registered **before** the user clicks the screenshare button.
 
 ---
 
 ## Building Video Tiles
 
-Each video stream gets its own **independent tile** identified by `tile-{memberId}-{streamType}`. This gives maximum layout flexibility â€” screenshare tiles can span multiple grid columns, expand on click, or move to a featured area.
+Each video stream gets its own **independent tile** identified by `tile-{memberId}-{streamType}`. This gives maximum layout flexibility — screenshare tiles can span multiple grid columns, expand on click, or move to a featured area.
 
 ### createVideoTile() Pattern
 
@@ -222,6 +262,7 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     tile.id = tileId;
     tile.dataset.memberId = memberId;
     tile.dataset.streamType = streamType;
+    tile.dataset.isLocal = isLocal ? 'true' : 'false';
 
     // Video container
     const videoContainer = document.createElement('div');
@@ -230,9 +271,9 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     const placeholder = document.createElement('div');
     placeholder.className = 'video-placeholder';
     if (streamType === 'camera') {
-        placeholder.innerHTML = `<span>${isLocal ? 'You' : name}</span>`;
+        placeholder.innerHTML = `<span>${isLocal ? `${name} (You)` : name}</span>`;
     } else {
-        placeholder.innerHTML = `<span>ðŸ–¥ï¸ ${isLocal ? 'Your' : name + "'s"} Screen</span>`;
+        placeholder.innerHTML = `<span>🖥️ ${isLocal ? `${name}'s (You)` : name + "'s"} Screen</span>`;
     }
 
     const video = document.createElement('video');
@@ -248,22 +289,26 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     memberInfo.className = 'member-info';
     if (streamType === 'camera') {
         memberInfo.innerHTML = `
-            <span class="member-name">${isLocal ? 'You' : name}</span>
+            <span class="member-name">${isLocal ? `${name} (You)` : name}</span>
             <div class="member-indicators">
                 <span class="status-badge"></span>
-                <span class="indicator cam-video" title="Camera">ðŸ“¹</span>
-                <span class="indicator cam-audio" title="Microphone">ðŸŽ¤</span>
+                <span class="indicator cam-video" title="Camera">📹</span>
+                <span class="indicator cam-audio" title="Microphone">🎤</span>
             </div>
         `;
     } else {
         memberInfo.innerHTML = `
-            <span class="member-name">ðŸ–¥ï¸ ${isLocal ? 'Your' : name + "'s"} Screen</span>
+            <span class="member-name">🖥️ ${isLocal ? `${name}'s (You)` : name + "'s"} Screen</span>
         `;
     }
 
     tile.appendChild(videoContainer);
     tile.appendChild(memberInfo);
-    document.getElementById('videoGrid').appendChild(tile);
+    // Camera tiles go to cameraGrid; screenshare tiles go to screenshareGrid
+    const targetGrid = streamType === 'screenshare'
+        ? document.getElementById('screenshareGrid')
+        : document.getElementById('cameraGrid');
+    targetGrid.appendChild(tile);
 
     // Register local elements immediately (Element-First Rule)
     if (isLocal) {
@@ -277,9 +322,11 @@ function createVideoTile(memberId, name, streamType, isLocal) {
 ```
 
 **Key points:**
-- Each tile is independent â€” camera and screenshare are separate grid items
-- `data-member-id` and `data-stream-type` attributes enable CSS targeting
-- CSS example: `.video-tile[data-stream-type="screenshare"] { grid-column: span 2; }`
+- Each tile is independent — camera and screenshare are separate grid items
+- `data-member-id`, `data-stream-type`, and `data-is-local` attributes enable CSS targeting and DOM queries
+- CSS examples: `#screenshareGrid .video-tile { width: 100%; }` · `.video-tile[data-is-local="true"] { border: 2px solid #0af; }`
+- To find all remote tiles: `document.querySelectorAll('.video-tile[data-is-local="false"]')`
+- **Two containers are required:** `#cameraGrid` for camera tiles and `#screenshareGrid` for screenshare tiles. This keeps them independently styled and positioned — screenshare tiles are typically larger, full-width, or in a separate column.
 - `playsInline` is required for iOS
 - `muted = true` on local video prevents audio feedback
 
@@ -287,32 +334,32 @@ function createVideoTile(memberId, name, streamType, isLocal) {
 
 ## Moving Video Tiles (Preview Areas, Featured Views)
 
-When implementing preview modes or featured speaker layouts, **always move the existing DOM element** â€” never remove and recreate.
+When implementing preview modes or featured speaker layouts, **always move the existing DOM element** — never remove and recreate.
 
-### âœ… The Safe Way: appendChild()
+### ✅ The Safe Way: appendChild()
 
 ```javascript
 // Move to preview area (PRE-LIVE)
 const tile = document.getElementById(`tile-${MiniChat.memberId}-camera`);
 document.getElementById('previewArea').appendChild(tile);
 
-// Move back to main grid (LIVE)
-document.getElementById('videoGrid').appendChild(tile);
+// Move back to camera grid (LIVE)
+document.getElementById('cameraGrid').appendChild(tile);
 ```
 
 **Why this works:** `appendChild()` **moves** the element. The `<video>` element's `srcObject` persists. Element registration remains valid. No re-registration needed.
 
-### âŒ Mistakes That Break Streams
+### ❌ Mistakes That Break Streams
 
 ```javascript
-// âŒ Remove then recreate â€” stream lost
+// ❌ Remove then recreate — stream lost
 oldTile.remove();
 createVideoTile(...);
 
-// âŒ Clone the element â€” new element has no stream
+// ❌ Clone the element — new element has no stream
 const clone = original.cloneNode(true);
 
-// âŒ Replace innerHTML â€” destroys the original element
+// ❌ Replace innerHTML — destroys the original element
 container.innerHTML = tile.outerHTML;
 ```
 
@@ -411,7 +458,7 @@ MiniChat.on('remoteStreamEnd', (memberId, streamType) => {
 });
 ```
 
-> **âš ï¸ Always create tiles on demand in `remoteStreamStart`.**
+> **⚠️ Always create tiles on demand in `remoteStreamStart`.**
 > When you call `startLive()`, WebRTC begins immediately. If others are already streaming, `remoteStreamStart` can fire **before** `remoteJoined`. If the tile doesn't exist, create it right there. Since `createVideoTile()` guards against duplicates, this is always safe.
 
 ### Video Placeholder vs Stream Presence
@@ -496,12 +543,12 @@ Check whether they truly exited or just returned to PRE-LIVE:
 ```javascript
 MiniChat.on('remoteLeft', (memberId) => {
     const m = MiniChat.getMember(memberId);
-    if (m?.displayStatus === 'INACTIVE') {
-        // Remove tiles â€” they've left
+    if (m?.displayStatus === 'EXITED') {
+        // Remove tiles — they've left
         document.getElementById(`tile-${memberId}-camera`)?.remove();
         document.getElementById(`tile-${memberId}-screenshare`)?.remove();
     }
-    // If PRE-LIVE, keep tiles â€” they may rejoin
+    // If PRE-LIVE, keep tiles — they may rejoin
 });
 ```
 
@@ -528,7 +575,7 @@ MiniChat.on('localJoined', async () => {
     const members = await MiniChat.getMembers();
     members.forEach(m => {
         if (m.id === MiniChat.memberId) return;
-        if (m.displayStatus === 'ACTIVE' || m.displayStatus === 'PRE-LIVE') {
+        if (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE') {
             createVideoTile(m.id, m.displayName, 'camera', false);
         }
     });
@@ -548,6 +595,26 @@ MiniChat.on('remoteJoined', (memberId) => {
     const m = MiniChat.getMember(memberId);
     createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
 });
+```
+
+> **Design choice: who gets a tile on `localJoined`?**
+>
+> The example above creates tiles for both `'LIVE'` and `'PRE-LIVE'` members when you go LIVE. This is the recommended default — you see everyone already in the channel, including those still preparing.
+>
+> You can restrict to `'LIVE'` only if your app only wants to show members who are actively streaming:
+> ```javascript
+> // Variation: streamers only
+> if (m.displayStatus === 'LIVE') {
+>     createVideoTile(m.id, m.displayName, 'camera', false);
+> }
+> ```
+> The tradeoff:
+> - **`'LIVE' || 'PRE-LIVE'`** — everyone present gets a tile immediately; good for small groups and social apps
+> - **`'LIVE'` only — tiles appear only when streaming starts; better for larger rooms or broadcast-style apps where PRE-LIVE presence is invisible by design
+>
+> Note: `remoteJoined` fires when a member goes LIVE (not when they enter PRE-LIVE), so it always represents a `'LIVE'` member — no filtering needed there.
+
+```javascript
 
 MiniChat.on('remoteStreamStart', (memberId, streamType) => {
     if (!MiniChat.isLive) return;  // Don't show if we're not live
@@ -562,18 +629,26 @@ MiniChat.on('remoteStreamStart', (memberId, streamType) => {
 ```javascript
 const member = MiniChat.getMember(memberId);
 member.displayName     // "Alex"
-member.displayStatus   // 'ACTIVE', 'PRE-LIVE', or 'INACTIVE'
+member.displayStatus   // 'LIVE', 'PRE-LIVE', or 'EXITED'
 member.hasCamera       // boolean
 member.hasScreenshare  // boolean
 
 // Fetch all current channel members from server
 const members = await MiniChat.getMembers();
-// â†’ [{ id, displayName, displayStatus, ... }]
+// → [{ id, displayName, displayStatus, ... }]
 ```
 
 Use `MiniChat.memberId` for your own member ID. Use `MiniChat.roomCode` for the shareable room code.
 
-`memberUpdate` fires for ALL members including yourself â€” useful for updating status badges.
+`memberUpdate` fires for ALL members including yourself. Always re-query `getMember(memberId)` inside the handler — the event is a signal that data changed, not a carrier of the new data:
+
+```javascript
+MiniChat.on('memberUpdate', (memberId) => {
+    const member = MiniChat.getMember(memberId);  // re-query for fresh state
+    if (!member) return;
+    // member.displayStatus, member.displayName, member.hasCamera, etc. are now current
+});
+```
 
 ---
 
@@ -594,6 +669,8 @@ A working app in under 50 lines of JavaScript:
             align-items: center; justify-content: center; color: white; font-size: 1.2em; }
         .hidden { display: none; }
         .visible { display: block; }
+        /* Screenshare tiles are wider — style independently from camera grid */
+        #screenshareGrid .video-tile { width: 100%; max-width: 800px; height: 450px; }
     </style>
 </head>
 <body>
@@ -601,9 +678,9 @@ A working app in under 50 lines of JavaScript:
 
     <div id="entry">
         <input id="name" placeholder="Your name">
-        <button onclick="doCreate()">Create Room</button>
+        <button id="createBtn">Create Room</button>
         <input id="code" placeholder="Room code">
-        <button onclick="doJoin()">Join Room</button>
+        <button id="joinBtn">Join Room</button>
     </div>
 
     <div id="controls" style="display: none;">
@@ -614,25 +691,26 @@ A working app in under 50 lines of JavaScript:
         <button onclick="MiniChat.toggleMuteAudio()">Mute/Unmute Mic</button>
     </div>
 
-    <div id="videoGrid" class="video-grid"></div>
+    <div id="screenshareGrid" class="video-grid"></div>
+    <div id="cameraGrid" class="video-grid"></div>
 
     <script type="module">
-        import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js';
+        import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/minichat-api.js';
 
         MiniChat.init({ contextId: 'Kw6w6w6w6w', contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB' });
 
         // --- Entry functions ---
 
-        window.doCreate = async () => {
+        document.getElementById('createBtn').addEventListener('click', async () => {
             await MiniChat.signup(document.getElementById('name').value || 'Guest');
             const room = await MiniChat.createRoom('My Room');
             await MiniChat.enterByRoomCode(room.room_code);
-        };
+        });
 
-        window.doJoin = async () => {
+        document.getElementById('joinBtn').addEventListener('click', async () => {
             await MiniChat.signup(document.getElementById('name').value || 'Guest');
             await MiniChat.enterByRoomCode(document.getElementById('code').value);
-        };
+        });
 
         // --- Events ---
 
@@ -656,7 +734,8 @@ A working app in under 50 lines of JavaScript:
         MiniChat.on('localJoined', async () => {
             const members = await MiniChat.getMembers();
             members.forEach(m => {
-                if (m.id !== MiniChat.memberId && m.displayStatus === 'ACTIVE') {
+                if (m.id !== MiniChat.memberId &&
+                    (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE')) {
                     createVideoTile(m.id, m.displayName, 'camera', false);
                 }
             });
@@ -708,10 +787,11 @@ A working app in under 50 lines of JavaScript:
 
         MiniChat.on('remoteLeft', (id) => {
             const m = MiniChat.getMember(id);
-            if (m?.displayStatus === 'INACTIVE') {
+            if (m?.displayStatus === 'EXITED') {
                 document.getElementById(`tile-${id}-camera`)?.remove();
                 document.getElementById(`tile-${id}-screenshare`)?.remove();
             }
+            // If PRE-LIVE, keep tiles — they stopped streaming but haven't left
         });
 
         MiniChat.on('error', (ctx, err) => console.error(`[${ctx}]`, err.message));
@@ -727,16 +807,21 @@ A working app in under 50 lines of JavaScript:
             tile.id = tileId;
             tile.dataset.memberId = memberId;
             tile.dataset.streamType = streamType;
+            tile.dataset.isLocal = isLocal ? 'true' : 'false';
             if (streamType === 'screenshare' && isLocal) tile.style.display = 'none';
 
             tile.innerHTML = `
                 <div class="video-placeholder"><span>${streamType === 'camera'
-                    ? (isLocal ? 'You' : name)
-                    : 'ðŸ–¥ï¸ ' + (isLocal ? 'Your' : name + "'s") + ' Screen'}</span></div>
+                    ? (isLocal ? `${name} (You)` : name)
+                    : '🖥️ ' + (isLocal ? `${name}'s (You)` : name + "'s") + ' Screen'}</span></div>
                 <video autoplay playsinline ${isLocal || streamType === 'screenshare' ? 'muted' : ''}></video>
             `;
 
-            document.getElementById('videoGrid').appendChild(tile);
+            // Camera tiles go to cameraGrid; screenshare tiles go to screenshareGrid
+            const targetGrid = streamType === 'screenshare'
+                ? document.getElementById('screenshareGrid')
+                : document.getElementById('cameraGrid');
+            targetGrid.appendChild(tile);
 
             if (isLocal) {
                 const video = tile.querySelector('video');
@@ -762,10 +847,10 @@ A working app in under 50 lines of JavaScript:
 | `login(email, password)` | Login with existing account |
 | `logout()` | Logout and cleanup |
 | `createRoom(title)` | Create room, returns `{ id, room_code, title }` |
-| `enterByRoomCode(code, displayName?)` | Enter room â†’ PRE-LIVE (displayName optional, updates member name) |
-| `startLive()` | Connect WebRTC â†’ LIVE |
-| `stopLive()` | Disconnect WebRTC â†’ PRE-LIVE |
-| `exitRoom()` | Full teardown, release camera |
+| `enterByRoomCode(code, displayName?)` | Enter room → PRE-LIVE (displayName optional, updates member name) |
+| `startLive()` | Connect WebRTC → LIVE |
+| `stopLive()` | Disconnect WebRTC → PRE-LIVE |
+| `exitRoom()` | Full teardown, release camera/mic — stay logged in |
 | `toggleAudio()` | Start/stop mic hardware |
 | `toggleVideo()` | Start/stop camera hardware |
 | `toggleScreenshare()` | Start/stop screen share |
@@ -796,11 +881,10 @@ A working app in under 50 lines of JavaScript:
 | `user` | Object | Current user |
 | `memberId` | string | Your member ID |
 | `roomCode` | string | Shareable room code |
-| `channel` | Object | Current channel |
+| `channel` | Object | Current channel: `{ id, room_code, title, description, memberCount }` |
 | `mediaState` | Object | `{ audio, video, audioMuted, videoMuted }` |
 | `screenState` | Object | `{ video, videoMuted }` |
 | `hasMedia` | boolean | Any local media active? |
-| `core` | Object | Underlying MiniChatCore (escape hatch) |
 
 ### Events
 
@@ -809,7 +893,7 @@ A working app in under 50 lines of JavaScript:
 | `login` | `(user)` | Logged in |
 | `loginError` | `(error)` | Login failed |
 | `logout` | `()` | Logged out |
-| `channelSelected` | `(channel)` | Entered a room (PRE-LIVE) |
+| `channelSelected` | `(channel)` | Entered a room (PRE-LIVE). `channel`: `{ id, room_code, title, description, memberCount }` |
 | `localJoined` | `()` | You went LIVE |
 | `localLeft` | `()` | You returned to PRE-LIVE |
 | `remoteJoined` | `(memberId)` | Remote member went LIVE |
@@ -825,31 +909,38 @@ A working app in under 50 lines of JavaScript:
 
 ## Common Mistakes
 
-1. **Not calling `init()` first** â€” Every method throws `"Call MiniChat.init() first"` without it.
+1. **Not calling `init()` first** — Every method throws `"Call MiniChat.init() first"` without it.
 
-2. **Not awaiting `signup()`** â€” Session and WebSocket won't be ready for subsequent calls.
+2. **Not awaiting `signup()`** — Session and WebSocket won't be ready for subsequent calls.
 
-3. **Forgetting `startLive()`** â€” `enterByRoomCode()` only puts you in PRE-LIVE. You must call `startLive()` to connect WebRTC and start sending/receiving media.
+3. **Forgetting `startLive()`** — `enterByRoomCode()` only puts you in PRE-LIVE. You must call `startLive()` to connect WebRTC and start sending/receiving media.
 
-4. **Creating video elements too late (Element-First Rule)** â€” Register elements *before* streams arrive. If you create a `<video>` element in `localMediaChange`, the stream is already lost.
+   PRE-LIVE is intentional, not just a waiting room. In PRE-LIVE, the local camera and mic work normally — you can call `toggleVideo()` and `toggleAudio()` and the user will see their own preview. Nothing is transmitted to others yet. This is the "green room": users adjust their setup privately before going live.
 
-   **âš ï¸ CRITICAL for screenshare:** The screenshare `<video>` element must exist and be registered with `setLocalScreen()` BEFORE calling `toggleScreenshare()`. Create both camera and screenshare tiles in `channelSelected`, with the screenshare tile hidden (`display: none`).
+   Common mistakes stemming from misunderstanding PRE-LIVE:
+   - Calling `startLive()` immediately inside `channelSelected` — this skips the green room and connects WebRTC before the user is ready.
+   - Expecting remote tiles to appear in PRE-LIVE — remote streams don't arrive until you call `startLive()`.
+   - Being surprised that `toggleVideo()` works in PRE-LIVE but nobody else can see you — correct behaviour, by design.
 
-5. **Not creating tiles on demand in `remoteStreamStart`** â€” Stream events can arrive before `remoteJoined`. Always check if the tile exists and create it if needed.
+4. **Creating video elements too late (Element-First Rule)** — Register elements *before* streams arrive. If you create a `<video>` element in `localMediaChange`, the stream is already lost.
 
-6. **Missing `playsInline` on video elements** â€” Required for iOS. Videos won't autoplay inline without it.
+   **⚠️ CRITICAL for screenshare:** The screenshare `<video>` element must exist and be registered with `setLocalScreen()` BEFORE calling `toggleScreenshare()`. Create both camera and screenshare tiles in `channelSelected`, with the screenshare tile hidden (`display: none`).
 
-7. **Not muting your own `<video>` element** â€” Always set `muted = true` on local video elements to prevent audio feedback/echo.
+5. **Not creating tiles on demand in `remoteStreamStart`** — Stream events can arrive before `remoteJoined`. Always check if the tile exists and create it if needed.
 
-8. **Not checking status in `remoteLeft`** â€” A member with `displayStatus === 'PRE-LIVE'` hasn't left; they may rejoin. Only remove tiles for `'INACTIVE'` members.
+6. **Missing `playsInline` on video elements** — Required for iOS. Videos won't autoplay inline without it.
 
-9. **Using `getMediaStates()` for local indicators** â€” Use `MiniChat.mediaState` for the local user. `getMediaStates(MiniChat.memberId)` reflects WebRTC state and is meaningless in PRE-LIVE.
+7. **Not muting your own `<video>` element** — Always set `muted = true` on local video elements to prevent audio feedback/echo.
 
-10. **Confusing toggle vs mute** â€” Camera: use `toggleVideo()` (hardware on/off). Microphone: use `toggleMuteAudio()` after initial startup (instant mute/unmute).
+8. **Not checking status in `remoteLeft`** — A member with `displayStatus === 'PRE-LIVE'` hasn't left; they may rejoin. Only remove tiles for `'EXITED'` members.
 
-11. **Removing and recreating tiles to move them** â€” Use `appendChild()` to move the existing element. Never `.remove()` then recreate â€” the stream attachment is lost.
+9. **Using `getMediaStates()` for local indicators** — Use `MiniChat.mediaState` for the local user. `getMediaStates(MiniChat.memberId)` reflects WebRTC state and is meaningless in PRE-LIVE.
 
-12. **Ignoring self status changes in `memberUpdate`** â€” While you shouldn't create tiles for yourself, you MUST update your UI controls (Start/Stop Live buttons, status text) when `memberId === MiniChat.memberId`. Check `member.displayStatus` and update buttons BEFORE returning:
+10. **Confusing toggle vs mute** — Camera: use `toggleVideo()` (hardware on/off). Microphone: use `toggleMuteAudio()` after initial startup (instant mute/unmute).
+
+11. **Removing and recreating tiles to move them** — Use `appendChild()` to move the existing element. Never `.remove()` then recreate — the stream attachment is lost.
+
+12. **Ignoring self status changes in `memberUpdate`** — While you shouldn't create tiles for yourself, you MUST update your UI controls (Start/Stop Live buttons, status text) when `memberId === MiniChat.memberId`. Check `member.displayStatus` and update buttons BEFORE returning:
    ```javascript
    MiniChat.on('memberUpdate', (memberId) => {
        const member = MiniChat.getMember(memberId);
@@ -870,4 +961,59 @@ A working app in under 50 lines of JavaScript:
 
 ---
 
-*MiniChat API v1.0 â€” Facade over MiniChatCore. For advanced use, access `MiniChat.core` for the full MiniChatCore API.*
+## Using MiniChat with React
+
+MiniChat works well with React. A few patterns to know:
+
+### Stabilize ref callbacks with `useCallback`
+
+MiniChat needs real DOM elements via `setLocalCamera()`, `setRemoteCamera()`, etc. In React, an inline ref callback creates a new function on every render, which causes React to tear down and re-fire the ref — re-registering the same element repeatedly. This can cause **video flicker**.
+
+Wrap ref callbacks in `useCallback`:
+
+```jsx
+const videoRefCallback = useCallback((el) => {
+    if (!el) return;
+    if (tile.isLocal) MiniChat.setLocalCamera(el);
+}, [tile.id, tile.isLocal, tile.streamType]);
+
+<video ref={videoRefCallback} autoPlay playsInline muted />
+```
+
+### The Element-First Rule in React
+
+The [Element-First Rule](#the-element-first-rule) requires local video elements to exist *before* streams are produced. In React, elements only exist after render — so if your component conditionally renders a tile based on state, the element won't be in the DOM when `toggleVideo()` runs.
+
+Always include local tiles in the render output and hide with `style` instead of unmounting:
+
+```jsx
+// ✅ Always in DOM — ref fires on mount, element ready before toggleVideo()
+const hideTile = tile.isLocal && !tile.showVideo;
+<div style={hideTile ? { display: 'none' } : {}}>
+    <video ref={videoRefCallback} ... />
+</div>
+
+// ❌ Element doesn't exist until showVideo is true — too late
+{tile.showVideo && <div><video ref={videoRefCallback} ... /></div>}
+```
+
+### Register remote elements after render
+
+When `remoteStreamStart` fires, you'll update state to add a tile — but React hasn't rendered yet, so the `<video>` element doesn't exist. Register remote elements in a `useEffect` that runs after the render completes:
+
+```jsx
+useEffect(() => {
+    tiles.forEach(tile => {
+        if (tile.isLocal || !tile.showVideo) return;
+        const el = videoRefs.current[tile.id];
+        if (!el) return;
+        MiniChat.setRemoteCamera(tile.memberId, el);
+    });
+}, [tiles]);
+```
+
+> **Note:** The API includes same-element guards, so calling `setRemoteCamera()` with an already-registered element is harmless. You don't need to track registration state yourself.
+
+---
+
+*MiniChat API v1.0*

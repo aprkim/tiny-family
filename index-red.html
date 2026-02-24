@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tiny Room</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%230EA5A4'/%3E%3Crect x='5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%23BF3143'/%3E%3Crect x='5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3C/svg%3E">
 <script type="importmap">
 {
     "imports": {
@@ -22,32 +22,32 @@
     --max: 980px;
     --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 
-    --bg: #f7f9f8;
+    --bg: #F7FAFC;
     --card: #ffffff;
-    --soft: #f0f4f3;
-    --border: #e2e8f0;
+    --soft: #F0F4F3;
+    --border: #E2E8F0;
     --borderSoft: #dbe2ea;
 
-    --text: #1e293b;
-    --muted: #64748b;
-    --muted2: #9ca3af;
+    --text: #1E293B;
+    --muted: #64748B;
+    --muted2: #9CA3AF;
 
-    --accent: #0EA5A4;
-    --accentHover: #0d9488;
-    --accentSoft: rgba(14,165,164,.10);
-    --accentBorder: rgba(14,165,164,.35);
+    --accent: #BF3143;
+    --accentHover: #A52A3A;
+    --accentSoft: rgba(191,49,67,.08);
+    --accentBorder: rgba(191,49,67,.18);
 
-    --liveBg: #e8f4ed;
-    --liveBorder: #a6c5a3;
+    --liveBg: #E8F4ED;
+    --liveBorder: #A6C5A3;
     --liveText: #324252;
 
-    --disabledBg: #f3f4f6;
-    --disabledBorder: #e5e7eb;
-    --disabledText: #6b7280;
+    --disabledBg: #F3F4F6;
+    --disabledBorder: #E5E7EB;
+    --disabledText: #6B7280;
 
-    --dangerBg: #FEF2F2;
-    --dangerBorder: #fca5a5;
-    --dangerText: #b91c1c;
+    --dangerBg: rgba(191,49,67,.06);
+    --dangerBorder: rgba(191,49,67,.25);
+    --dangerText: #BF3143;
 
     --overlay: rgba(30, 41, 59, 0.5);
 }
@@ -63,18 +63,18 @@
     --muted: #9ca3af;
     --muted2: #6b7280;
 
-    --accent: #0EA5A4;
-    --accentHover: #14b8a6;
-    --accentSoft: rgba(14,165,164,.18);
-    --accentBorder: rgba(14,165,164,.45);
+    --accent: #D93A4F;
+    --accentHover: #E84D62;
+    --accentSoft: rgba(217,58,79,.18);
+    --accentBorder: rgba(217,58,79,.45);
 
     --liveBg: rgba(16,185,129,.15);
     --liveBorder: rgba(16,185,129,.4);
     --liveText: #a7f3d0;
 
-    --dangerBg: rgba(239,68,68,.15);
-    --dangerBorder: rgba(239,68,68,.4);
-    --dangerText: #fca5a5;
+    --dangerBg: rgba(217,58,79,.15);
+    --dangerBorder: rgba(217,58,79,.4);
+    --dangerText: #F9A8B4;
 
     --overlay: rgba(0,0,0,0.6);
 }
@@ -614,12 +614,12 @@ input::placeholder { color: var(--muted2); }
     padding: 0.15rem;
     border-radius: 4px;
     color: var(--accent);
-    background: rgba(14,165,164,.25);
+    background: rgba(191,49,67,.25);
 }
 
 .member-info .indicator {
     color: #fff;
-    background: rgba(14,165,164,.7);
+    background: rgba(191,49,67,.7);
 }
 
 .indicator.off {
@@ -1207,9 +1207,6 @@ function updateEntryButtons() {
 const urlCode = new URLSearchParams(window.location.search).get('code');
 if (urlCode) {
     codeInput.value = urlCode;
-    // Hide "Start a Room" and divider when joining via link
-    btnCreate.style.display = 'none';
-    document.querySelector('.entry-divider').style.display = 'none';
 }
 
 updateEntryButtons();
@@ -1391,8 +1388,8 @@ window.toggleLiveScreen = () => {
     const isCurrentlySharing = existingTile && existingTile.style.display !== 'none';
 
     if (isCurrentlySharing) {
-        // Stopping share: hide tile, then toggle
-        existingTile.style.display = 'none';
+        // Stopping share: remove tile, then toggle
+        existingTile.remove();
         updateGridLayout();
         chat.toggleScreenshare();
     } else {
@@ -2074,15 +2071,6 @@ function setupEventHandlers() {
         const tileId = `tile-${memberId}-${streamType}`;
         const tile = document.getElementById(tileId);
         if (!tile) return;
-
-        // Screenshare with video OFF means sharing stopped — remove tile
-        // (onRemoteMemberStreamEnd may not fire reliably for all participants)
-        if (streamType === 'screenshare' && states.screen_video_detail === 'OFF') {
-            tile.remove();
-            updateGridLayout();
-            updateMemberIndicators(memberId, streamType);
-            return;
-        }
 
         const video = tile.querySelector('video');
         const placeholder = tile.querySelector('.video-placeholder');
