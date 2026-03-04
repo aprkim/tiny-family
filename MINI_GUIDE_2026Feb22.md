@@ -18,7 +18,7 @@ Import directly from the source file, which has `export default`:
 
 ```html
 <script type="module">
-    import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/minichat-api.js';
+    import MiniChat from 'https://proto2.makedo.com/v05/scripts/minichat-api.js';
 
     MiniChat.init({
         contextId: 'YOUR_CONTEXT_ID',
@@ -41,7 +41,7 @@ Load `makedo-vibelive.min.js` with a plain `<script>` tag. No `import`, no modul
 
 ```html
 <!-- Load the bundle — puts MiniChat on window immediately -->
-<script src="https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js"></script>
+<script src="https://proto2.makedo.com/v05/scripts/makedo-vibelive.min.js"></script>
 
 <script>
     MiniChat.init({
@@ -695,7 +695,7 @@ A working app in under 50 lines of JavaScript:
     <div id="cameraGrid" class="video-grid"></div>
 
     <script type="module">
-        import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/minichat-api.js';
+        import MiniChat from 'https://proto2.makedo.com/v05/scripts/minichat-api.js';
 
         MiniChat.init({ contextId: 'Kw6w6w6w6w', contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB' });
 

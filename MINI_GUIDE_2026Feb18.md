@@ -12,7 +12,7 @@ Import and initialize MiniChat:
 
 ```html
 <script type="module">
-    import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js';
+    import MiniChat from 'https://proto2.makedo.com/v05/scripts/makedo-vibelive.min.js';
 
     MiniChat.init({
         contextId: 'YOUR_CONTEXT_ID',
@@ -641,7 +641,7 @@ A working app in under 50 lines of JavaScript:
     <div id="videoGrid" class="video-grid"></div>
 
     <script type="module">
-        import MiniChat from 'https://proto2.makedo.com:8883/v05/scripts/makedo-vibelive.min.js';
+        import MiniChat from 'https://proto2.makedo.com/v05/scripts/makedo-vibelive.min.js';
 
         MiniChat.init({ contextId: 'Kw6w6w6w6w', contextAuthToken: 'qftRdeQ12ZcrKYixauWpxGiB' });
 

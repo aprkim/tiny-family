@@ -4,7 +4,7 @@ const { defineSecret } = require("firebase-functions/params");
 const contextId = defineSecret("CONTEXT_ID");
 const contextAuthToken = defineSecret("CONTEXT_AUTH_TOKEN");
 
-const VIBELIVE_API = "https://proxy2.makedo.com:8883/v05/api";
+const VIBELIVE_API = "https://proxy2.makedo.com/v05/api";
 const ALLOWED_ACTIONS = ["createUser", "getToken"];
 
 exports.proxy = onRequest(
