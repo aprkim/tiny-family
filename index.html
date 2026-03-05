@@ -1139,6 +1139,15 @@ input::placeholder { color: var(--muted2); }
     </div>
 </div>
 
+<!-- Kicked Modal -->
+<div id="kickedOverlay" style="display:none; position:fixed; inset:0; background:var(--overlay); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border-radius:16px; padding:28px 24px 20px; max-width:340px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,.18); text-align:center;">
+        <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:16px;" id="kickedTitle">Session ended</div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:24px; white-space:pre-line;" id="kickedMessage"></div>
+        <button onclick="closeKickedModal()" style="background:var(--accent); color:#fff; border:none; border-radius:10px; padding:10px 32px; font-size:14px; font-weight:600; cursor:pointer;">OK</button>
+    </div>
+</div>
+
 <script type="module">
 import MiniChat from 'https://makedo.com/sdk/minichat-api.js';
 
@@ -2305,6 +2314,22 @@ MiniChat.on('error', (context, error) => {
     console.error('MiniChat error:', context, error);
     showError(`Error: ${context}`);
 });
+
+MiniChat.on('kicked', (message) => {
+    // Server ended the meeting — don't call exitRoom(), SDK already cleaned up
+    document.getElementById('videoGrid').innerHTML = '';
+    document.getElementById('previewArea').innerHTML = '';
+    showScreen('entryScreen');
+    updateEntryButtons();
+
+    const overlay = document.getElementById('kickedOverlay');
+    document.getElementById('kickedMessage').textContent = message || 'You have been removed from the meeting.';
+    overlay.style.display = 'flex';
+});
+
+window.closeKickedModal = () => {
+    document.getElementById('kickedOverlay').style.display = 'none';
+};
 
 // ===== Update Control Button States =====
 function updateLocalControlUI() {
