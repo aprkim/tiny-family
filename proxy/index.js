@@ -1,4 +1,4 @@
-const VIBELIVE_API = "https://makedo.com/api/authUsers.jsp";
+const VIBELIVE_API = "https://makedo.com/api/vibelive/authUsers.jsp";
 
 export default {
   async fetch(request, env) {
