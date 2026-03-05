@@ -1,4 +1,4 @@
-const VIBELIVE_API = "https://proto2.makedo.com/v05/authUsers.jsp";
+const VIBELIVE_API = "https://makedo.com/api/authUsers.jsp";
 
 export default {
   async fetch(request, env) {
@@ -24,17 +24,15 @@ export default {
       return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    // Add contextAuthToken and forward to VibeLive
-    const payload = {
-      ...body,
-      contextAuthToken: env.CONTEXT_AUTH_TOKEN,
-    };
-
+    // Forward to VibeLive with auth token as header
     try {
       const response = await fetch(VIBELIVE_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Context-Auth-Token": env.CONTEXT_AUTH_TOKEN,
+        },
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       return Response.json(data, {
