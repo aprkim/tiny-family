@@ -1149,7 +1149,7 @@ input::placeholder { color: var(--muted2); }
 </div>
 
 <script type="module">
-import MiniChat from 'https://makedo.com/sdk/minichat-api.js';
+import VibeLive from 'https://makedo.com/sdk/vibelive-api.js';
 
 // ===== Firebase =====
 const FIREBASE_DB = 'https://tiny-room-3967e-default-rtdb.firebaseio.com';
@@ -1192,7 +1192,7 @@ let customSlug = '';
 let requiredPin = null;
 
 // ===== Init =====
-MiniChat.init({
+VibeLive.init({
     contextId: 'Kw6w6w6w6w',
     proxy: 'https://tinyroom-proxy.aprkim.workers.dev'
 });
@@ -1340,6 +1340,19 @@ function showToast(msg) {
 }
 
 // ===== Error =====
+function friendlyError(e) {
+    const msg = (e.message || '').toLowerCase();
+    if (msg.includes('signup') || msg.includes('unauthorized') || msg.includes('auth'))
+        return 'Connection to video service failed. Please try again later.';
+    if (msg.includes('network') || msg.includes('fetch'))
+        return 'Network error. Check your internet connection and try again.';
+    if (msg.includes('room') && msg.includes('not found'))
+        return 'Room not found. Check the room code and try again.';
+    if (msg.includes('full'))
+        return 'This room is full.';
+    return e.message || 'Something went wrong. Please try again.';
+}
+
 function showError(msg) {
     const b = document.getElementById('errorBanner');
     b.textContent = msg;
@@ -1361,17 +1374,17 @@ function showCopiedTip(btn, text) {
 }
 
 window.copyRawCode = (btn) => {
-    if (!MiniChat.roomCode) return;
-    navigator.clipboard.writeText(MiniChat.roomCode).then(() => {
+    if (!VibeLive.roomCode) return;
+    navigator.clipboard.writeText(VibeLive.roomCode).then(() => {
         if (btn) showCopiedTip(btn, 'Copied!');
     }).catch(() => {});
 };
 
 window.copyLink = (btn) => {
-    if (!MiniChat.roomCode) return;
+    if (!VibeLive.roomCode) return;
     const url = customSlug
         ? window.location.origin + '/in/' + customSlug
-        : window.location.origin + '/?code=' + MiniChat.roomCode;
+        : window.location.origin + '/?code=' + VibeLive.roomCode;
     navigator.clipboard.writeText(url).then(() => {
         if (btn) showCopiedTip(btn, 'Copied!');
     }).catch(() => {});
@@ -1390,13 +1403,13 @@ function sanitizeSlug(raw) {
 }
 
 function updateAllCodeBadges() {
-    const displayText = customSlug || MiniChat.roomCode || '';
+    const displayText = customSlug || VibeLive.roomCode || '';
     const preBadge = document.getElementById('preLiveCodeText');
     const liveBadge = document.getElementById('liveCode');
     preBadge.textContent = displayText;
     liveBadge.textContent = displayText;
-    const tip = customSlug && MiniChat.roomCode
-        ? `${customSlug} (code: ${MiniChat.roomCode}) — click to edit`
+    const tip = customSlug && VibeLive.roomCode
+        ? `${customSlug} (code: ${VibeLive.roomCode}) — click to edit`
         : 'Click to set a custom room name';
     preBadge.title = tip;
     liveBadge.title = tip;
@@ -1413,7 +1426,7 @@ function makeCodeBadgeEditable(badgeEl) {
         input.type = 'text';
         input.className = 'topbar-code-edit';
         input.value = customSlug;
-        input.placeholder = MiniChat.roomCode || 'custom-name';
+        input.placeholder = VibeLive.roomCode || 'custom-name';
         input.maxLength = 48;
 
         const pinInput = document.createElement('input');
@@ -1445,15 +1458,15 @@ function makeCodeBadgeEditable(badgeEl) {
             const newSlug = sanitizeSlug(input.value);
             const pin = pinInput.value.replace(/\D/g, '');
 
-            if (newSlug && MiniChat.roomCode) {
+            if (newSlug && VibeLive.roomCode) {
                 const existing = await lookupSlug(newSlug);
-                if (existing && existing.code !== MiniChat.roomCode) {
+                if (existing && existing.code !== VibeLive.roomCode) {
                     showError(`"${newSlug}" is already taken`);
                     committed = false;
                     return;
                 }
                 customSlug = newSlug;
-                saveSlug(customSlug, MiniChat.roomCode, pin || null);
+                saveSlug(customSlug, VibeLive.roomCode, pin || null);
             } else {
                 customSlug = newSlug;
             }
@@ -1499,11 +1512,11 @@ window.createRoom = async () => {
     btnCreate.innerHTML = '<span class="spinner"></span>Creating...';
 
     try {
-        await MiniChat.signup(name);
-        const room = await MiniChat.createRoom(`${name}'s Tiny Room`);
-        await MiniChat.enterByRoomCode(room.room_code);
+        await VibeLive.signup(name);
+        const room = await VibeLive.createRoom(`${name}'s Tiny Room`);
+        await VibeLive.enterByRoomCode(room.room_code);
     } catch (e) {
-        showError('Failed to create room: ' + e.message);
+        showError(friendlyError(e));
         btnCreate.disabled = false;
         btnCreate.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a Room';
     }
@@ -1527,10 +1540,10 @@ window.joinRoom = async () => {
     btnJoin.disabled = true;
 
     try {
-        await MiniChat.signup(name);
-        await MiniChat.enterByRoomCode(code);
+        await VibeLive.signup(name);
+        await VibeLive.enterByRoomCode(code);
     } catch (e) {
-        showError('Failed to join room: ' + e.message);
+        showError(friendlyError(e));
         btnJoin.disabled = false;
         btnJoin.textContent = 'Join';
     }
@@ -1538,18 +1551,18 @@ window.joinRoom = async () => {
 
 // ===== Pre-Live Controls =====
 window.togglePreCam = () => {
-    MiniChat.toggleVideo();
+    VibeLive.toggleVideo();
 };
 
 window.togglePreMic = () => {
-    MiniChat.toggleAudio();
+    VibeLive.toggleAudio();
 };
 
 // ===== Back to Entry =====
 window.backToEntry = () => {
     isLeavingRoom = true;
     customSlug = '';
-    MiniChat.exitRoom();
+    VibeLive.exitRoom();
     document.getElementById('previewArea').innerHTML = '';
 
     showScreen('entryScreen');
@@ -1564,7 +1577,7 @@ window.backToEntry = () => {
 // ===== Go Live =====
 window.goLive = async () => {
     try {
-        await MiniChat.startLive();
+        await VibeLive.startLive();
     } catch (e) {
         showError('Failed to go live: ' + e.message);
     }
@@ -1572,25 +1585,25 @@ window.goLive = async () => {
 
 // ===== Live Controls =====
 window.toggleLiveMic = () => {
-    const s = MiniChat.mediaState;
+    const s = VibeLive.mediaState;
     if (!s.audio) {
-        MiniChat.toggleAudio();
+        VibeLive.toggleAudio();
     } else {
-        MiniChat.toggleMuteAudio();
+        VibeLive.toggleMuteAudio();
     }
 };
 
 window.toggleLiveCam = () => {
-    MiniChat.toggleVideo();
+    VibeLive.toggleVideo();
 };
 
 window.toggleLiveScreen = () => {
-    const screenTileId = `tile-${MiniChat.memberId}-screenshare`;
+    const screenTileId = `tile-${VibeLive.memberId}-screenshare`;
     let existingTile = document.getElementById(screenTileId);
 
     // Ensure tile exists before starting (Element-First Rule)
     if (!existingTile) {
-        const tile = createVideoTile(MiniChat.memberId, localName, 'screenshare', true);
+        const tile = createVideoTile(VibeLive.memberId, localName, 'screenshare', true);
         if (tile) {
             tile.style.display = 'none';
             document.getElementById('videoGrid').appendChild(tile);
@@ -1598,14 +1611,14 @@ window.toggleLiveScreen = () => {
     }
 
     // Let localMediaChange handle showing/removing the tile
-    MiniChat.toggleScreenshare();
+    VibeLive.toggleScreenshare();
 };
 
 // ===== Leave Room =====
 window.leaveRoom = () => {
     isLeavingRoom = true;
     customSlug = '';
-    MiniChat.exitRoom();
+    VibeLive.exitRoom();
 
     document.getElementById('videoGrid').innerHTML = '';
     document.getElementById('previewArea').innerHTML = '';
@@ -1723,9 +1736,9 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     // Register local elements immediately (Element-First Rule)
     if (isLocal) {
         if (streamType === 'camera') {
-            MiniChat.setLocalCamera(video);
+            VibeLive.setLocalCamera(video);
         } else {
-            MiniChat.setLocalScreen(video);
+            VibeLive.setLocalScreen(video);
         }
     }
 
@@ -2046,7 +2059,7 @@ window.resetTileLayout = () => {
 
 // ===== Member Indicators =====
 function updateMemberIndicators(memberId, streamType) {
-    const isLocal = memberId === MiniChat.memberId;
+    const isLocal = memberId === VibeLive.memberId;
 
     // Camera tile indicators
     const camTile = document.getElementById(`tile-${memberId}-camera`);
@@ -2054,11 +2067,11 @@ function updateMemberIndicators(memberId, streamType) {
         let camOn, micOn;
 
         if (isLocal) {
-            const s = MiniChat.mediaState;
+            const s = VibeLive.mediaState;
             camOn = s.video;
             micOn = s.audio && !s.audioMuted;
         } else {
-            const states = MiniChat.getMediaStates(memberId);
+            const states = VibeLive.getMediaStates(memberId);
             camOn = states?.cam_video_detail === 'ON';
             micOn = states?.cam_audio_detail === 'ON';
         }
@@ -2078,12 +2091,12 @@ function updateMemberIndicators(memberId, streamType) {
         if (badge) {
             badge.className = 'status-badge';
             if (isLocal) {
-                if (MiniChat.isLive) {
+                if (VibeLive.isLive) {
                     badge.classList.add('live');
                     badge.textContent = 'LIVE';
                 }
             } else {
-                const m = MiniChat.getMember(memberId);
+                const m = VibeLive.getMember(memberId);
                 if (m?.displayStatus === 'LIVE') {
                     badge.classList.add('live');
                     badge.textContent = 'LIVE';
@@ -2097,9 +2110,9 @@ function updateMemberIndicators(memberId, streamType) {
     if (screenTile) {
         let screenOn;
         if (isLocal) {
-            screenOn = MiniChat.screenState.video;
+            screenOn = VibeLive.screenState.video;
         } else {
-            const states = MiniChat.getMediaStates(memberId);
+            const states = VibeLive.getMediaStates(memberId);
             screenOn = states?.screen_video_detail === 'ON';
         }
         const screenInd = screenTile.querySelector('.screen-video');
@@ -2111,13 +2124,13 @@ function updateMemberIndicators(memberId, streamType) {
 }
 
 // ===== Event Handlers =====
-MiniChat.on('channelSelected', async (channel) => {
+VibeLive.on('channelSelected', async (channel) => {
     updateAllCodeBadges();
 
     showScreen('preLiveScreen');
 
-    const members = await MiniChat.getMembers();
-    const self = members.find(m => m.id === MiniChat.memberId);
+    const members = await VibeLive.getMembers();
+    const self = members.find(m => m.id === VibeLive.memberId);
     if (self) {
         const camTile = createVideoTile(self.id, self.displayName, 'camera', true);
         if (camTile) document.getElementById('previewArea').appendChild(camTile);
@@ -2129,21 +2142,21 @@ MiniChat.on('channelSelected', async (channel) => {
         }
     }
 
-    await MiniChat.toggleVideo();
-    await MiniChat.toggleAudio();
+    await VibeLive.toggleVideo();
+    await VibeLive.toggleAudio();
 });
 
-MiniChat.on('localJoined', async () => {
+VibeLive.on('localJoined', async () => {
     showScreen('liveScreen');
 
-    const localCamTile = document.getElementById(`tile-${MiniChat.memberId}-camera`);
+    const localCamTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
     if (localCamTile) {
         document.getElementById('videoGrid').appendChild(localCamTile);
     }
 
-    const members = await MiniChat.getMembers();
+    const members = await VibeLive.getMembers();
     members.forEach(m => {
-        if (m.id === MiniChat.memberId) return;
+        if (m.id === VibeLive.memberId) return;
         if (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE') {
             const tile = createVideoTile(m.id, m.displayName, 'camera', false);
             if (tile) document.getElementById('videoGrid').appendChild(tile);
@@ -2154,16 +2167,16 @@ MiniChat.on('localJoined', async () => {
     updateLocalControlUI();
 });
 
-MiniChat.on('localLeft', () => {
+VibeLive.on('localLeft', () => {
     if (isLeavingRoom) return;
 
     document.querySelectorAll('#videoGrid .video-tile').forEach(tile => {
-        if (tile.dataset.memberId !== MiniChat.memberId) {
+        if (tile.dataset.memberId !== VibeLive.memberId) {
             tile.remove();
         }
     });
 
-    const localCamTile = document.getElementById(`tile-${MiniChat.memberId}-camera`);
+    const localCamTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
     if (localCamTile) {
         document.getElementById('previewArea').appendChild(localCamTile);
     }
@@ -2172,16 +2185,16 @@ MiniChat.on('localLeft', () => {
     updateGridLayout();
 });
 
-MiniChat.on('remoteJoined', (memberId) => {
-    if (!MiniChat.isLive) return;
-    const m = MiniChat.getMember(memberId);
+VibeLive.on('remoteJoined', (memberId) => {
+    if (!VibeLive.isLive) return;
+    const m = VibeLive.getMember(memberId);
     const tile = createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
     if (tile) document.getElementById('videoGrid').appendChild(tile);
     updateGridLayout();
 });
 
-MiniChat.on('remoteLeft', (memberId) => {
-    const m = MiniChat.getMember(memberId);
+VibeLive.on('remoteLeft', (memberId) => {
+    const m = VibeLive.getMember(memberId);
     if (m?.displayStatus === 'EXITED') {
         document.getElementById(`tile-${memberId}-camera`)?.remove();
         document.getElementById(`tile-${memberId}-screenshare`)?.remove();
@@ -2189,22 +2202,22 @@ MiniChat.on('remoteLeft', (memberId) => {
     }
 });
 
-MiniChat.on('memberUpdate', (memberId) => {
-    const member = MiniChat.getMember(memberId);
+VibeLive.on('memberUpdate', (memberId) => {
+    const member = VibeLive.getMember(memberId);
     if (!member) return;
 
     // Update self controls when own status changes
-    if (memberId === MiniChat.memberId) {
+    if (memberId === VibeLive.memberId) {
         updateLocalControlUI();
     }
 
     updateMemberIndicators(memberId);
 });
 
-MiniChat.on('remoteStreamStart', (memberId, streamType) => {
-    if (!MiniChat.isLive) return;
+VibeLive.on('remoteStreamStart', (memberId, streamType) => {
+    if (!VibeLive.isLive) return;
 
-    const m = MiniChat.getMember(memberId);
+    const m = VibeLive.getMember(memberId);
     const tileId = `tile-${memberId}-${streamType}`;
     let tile = document.getElementById(tileId);
 
@@ -2222,9 +2235,9 @@ MiniChat.on('remoteStreamStart', (memberId, streamType) => {
     if (video) {
         video.classList.add('visible');
         if (streamType === 'camera') {
-            MiniChat.setRemoteCamera(memberId, video);
+            VibeLive.setRemoteCamera(memberId, video);
         } else {
-            MiniChat.setRemoteScreen(memberId, video);
+            VibeLive.setRemoteScreen(memberId, video);
         }
     }
 
@@ -2232,7 +2245,7 @@ MiniChat.on('remoteStreamStart', (memberId, streamType) => {
     updateMemberIndicators(memberId, streamType);
 });
 
-MiniChat.on('remoteStreamEnd', (memberId, streamType) => {
+VibeLive.on('remoteStreamEnd', (memberId, streamType) => {
     const tileId = `tile-${memberId}-${streamType}`;
     const tile = document.getElementById(tileId);
     if (!tile) return;
@@ -2250,8 +2263,8 @@ MiniChat.on('remoteStreamEnd', (memberId, streamType) => {
     updateMemberIndicators(memberId, streamType);
 });
 
-MiniChat.on('remoteMediaChange', (memberId, streamType) => {
-    const states = MiniChat.getMediaStates(memberId);
+VibeLive.on('remoteMediaChange', (memberId, streamType) => {
+    const states = VibeLive.getMediaStates(memberId);
     const tileId = `tile-${memberId}-${streamType}`;
     const tile = document.getElementById(tileId);
     if (!tile) return;
@@ -2277,11 +2290,11 @@ MiniChat.on('remoteMediaChange', (memberId, streamType) => {
     updateMemberIndicators(memberId, streamType);
 });
 
-MiniChat.on('localMediaChange', () => {
-    const s = MiniChat.mediaState;
-    const screen = MiniChat.screenState;
+VibeLive.on('localMediaChange', () => {
+    const s = VibeLive.mediaState;
+    const screen = VibeLive.screenState;
 
-    const camTile = document.getElementById(`tile-${MiniChat.memberId}-camera`);
+    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
     if (camTile) {
         const placeholder = camTile.querySelector('.video-placeholder');
         const video = camTile.querySelector('video');
@@ -2294,7 +2307,7 @@ MiniChat.on('localMediaChange', () => {
         }
     }
 
-    const screenTile = document.getElementById(`tile-${MiniChat.memberId}-screenshare`);
+    const screenTile = document.getElementById(`tile-${VibeLive.memberId}-screenshare`);
     if (screenTile) {
         if (screen.video) {
             screenTile.style.display = 'flex';
@@ -2307,15 +2320,15 @@ MiniChat.on('localMediaChange', () => {
 
     updateGridLayout();
     updateLocalControlUI();
-    updateMemberIndicators(MiniChat.memberId);
+    updateMemberIndicators(VibeLive.memberId);
 });
 
-MiniChat.on('error', (context, error) => {
-    console.error('MiniChat error:', context, error);
+VibeLive.on('error', (context, error) => {
+    console.error('VibeLive error:', context, error);
     showError(`Error: ${context}`);
 });
 
-MiniChat.on('kicked', (message) => {
+VibeLive.on('kicked', (message) => {
     // Server ended the meeting — don't call exitRoom(), SDK already cleaned up
     document.getElementById('videoGrid').innerHTML = '';
     document.getElementById('previewArea').innerHTML = '';
@@ -2333,8 +2346,8 @@ window.closeKickedModal = () => {
 
 // ===== Update Control Button States =====
 function updateLocalControlUI() {
-    const s = MiniChat.mediaState;
-    const screen = MiniChat.screenState;
+    const s = VibeLive.mediaState;
+    const screen = VibeLive.screenState;
 
     const camOn = s.video;
     const micOn = s.audio && !s.audioMuted;
