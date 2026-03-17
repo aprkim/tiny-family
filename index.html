@@ -973,6 +973,18 @@ input::placeholder { color: var(--muted2); }
 .screenshare-area .video-tile { flex: none; width: 100%; }
 .camera-strip .video-tile { flex: 0 0 120px; width: 120px; }
 
+/* Mobile landscape */
+@media (orientation: landscape) and (max-height: 500px) {
+    #videoGrid.grid-2 { grid-template-columns: 1fr 1fr; }
+    #videoGrid.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    #videoGrid.grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .controls-bar { padding: 0.3rem 0.5rem; }
+    .controls-bar .ctrl-btn { width: 40px; height: 40px; }
+    .controls-bar .ctrl-btn svg { width: 18px; height: 18px; }
+    .live-topbar { padding: 0.3rem 0.75rem; min-height: 36px; }
+    .live-topbar h3 { font-size: 0.85rem; }
+}
+
 /* Tablet+ (641px) */
 @media (min-width: 641px) {
     #videoGrid.grid-2 { grid-template-columns: 1fr 1fr; }
