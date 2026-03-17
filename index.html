@@ -1576,11 +1576,11 @@ window.joinRoom = async () => {
 
 // ===== Pre-Live Controls =====
 window.togglePreCam = () => {
-    VibeLive.toggleVideo();
+    try { VibeLive.toggleVideo(); } catch (e) { console.warn('toggleVideo:', e); }
 };
 
 window.togglePreMic = () => {
-    VibeLive.toggleAudio();
+    try { VibeLive.toggleAudio(); } catch (e) { console.warn('toggleAudio:', e); }
 };
 
 // ===== Back to Entry =====
@@ -2354,7 +2354,10 @@ VibeLive.on('localMediaChange', () => {
 
 VibeLive.on('error', (context, error) => {
     console.error('VibeLive error:', context, error);
-    showError(`Error: ${context}`);
+    // Suppress non-critical media toggle errors
+    const suppress = ['toggleVideo', 'toggleAudio', 'toggleMuteAudio'];
+    if (suppress.includes(context)) return;
+    showError(friendlyError(error || { message: context }));
 });
 
 VibeLive.on('kicked', (message) => {
