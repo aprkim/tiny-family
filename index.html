@@ -500,7 +500,7 @@ input::placeholder { color: var(--muted2); }
     display: grid;
     gap: 8px;
     padding: 8px;
-    align-content: center;
+    align-content: stretch;
     overflow: hidden;
     position: relative;
     transition: grid-template-columns 0.25s ease, grid-template-rows 0.25s ease;
@@ -991,6 +991,7 @@ input::placeholder { color: var(--muted2); }
 
 /* Tablet+ (641px) */
 @media (min-width: 641px) {
+    #videoGrid { align-content: center; }
     #videoGrid.grid-2 { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
     #videoGrid.grid-2 .video-tile { height: auto; }
     #videoGrid.grid-2 .video-tile::before { display: block; }
