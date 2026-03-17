@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal Preview</title>
+    <style>
+        :root {
+            --radius: 16px;
+            --bg: #f7f9f8;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --accent: #0EA5A4;
+            --overlay: rgba(30, 41, 59, 0.5);
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --card: #111827;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --accent: #0EA5A4;
+            --overlay: rgba(0, 0, 0, 0.6);
+        }
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 12px;
+        }
+        button.trigger {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button.theme-toggle {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--muted);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<button class="trigger" onclick="showModal('The 2-minute trial streaming limit was reached.')">Trial Limit</button>
+<button class="trigger" onclick="showModal('You have been removed from the meeting.')">Kicked</button>
+<button class="trigger" onclick="showModal('The host has ended this meeting for all participants.\nThank you for joining!')">Host Ended (multiline)</button>
+
+<!-- Kicked Modal (same as index.html) -->
+<div id="kickedOverlay" style="display:none; position:fixed; inset:0; background:var(--overlay); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border-radius:16px; padding:28px 24px 20px; max-width:340px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,.18); text-align:center;">
+        <div style="font-size:14px; font-weight:600; color:var(--text); margin-bottom:16px;" id="kickedTitle">Session ended</div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:24px; white-space:pre-line;" id="kickedMessage"></div>
+        <button onclick="closeModal()" style="background:var(--accent); color:#fff; border:none; border-radius:10px; padding:10px 32px; font-size:14px; font-weight:600; cursor:pointer;">OK</button>
+    </div>
+</div>
+
+<button class="theme-toggle" onclick="toggleTheme()">Toggle Light/Dark</button>
+
+<script>
+function showModal(message) {
+    document.getElementById('kickedMessage').textContent = message;
+    document.getElementById('kickedOverlay').style.display = 'flex';
+}
+function closeModal() {
+    document.getElementById('kickedOverlay').style.display = 'none';
+}
+function toggleTheme() {
+    const html = document.documentElement;
+    html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+}
+</script>
+</body>
+</html>

@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tiny Room</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%230EA5A4'/%3E%3Crect x='5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3C/svg%3E">
+<title>Tiny Family</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%23BF3143'/%3E%3Crect x='5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3C/svg%3E">
 <style>
 /* ===== Reset & Base ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
     --radius: 16px;
-    --max: 980px;
+    --max: 100%;
     --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 
     --bg: #f7f9f8;
@@ -24,10 +24,10 @@
     --muted: #64748b;
     --muted2: #9ca3af;
 
-    --accent: #0EA5A4;
-    --accentHover: #0d9488;
-    --accentSoft: rgba(14,165,164,.10);
-    --accentBorder: rgba(14,165,164,.35);
+    --accent: #BF3143;
+    --accentHover: rgba(191,49,67,.85);
+    --accentSoft: rgba(191,49,67,.08);
+    --accentBorder: rgba(191,49,67,.18);
 
     --liveBg: #e8f4ed;
     --liveBorder: #a6c5a3;
@@ -55,10 +55,10 @@
     --muted: #9ca3af;
     --muted2: #6b7280;
 
-    --accent: #0EA5A4;
-    --accentHover: #14b8a6;
-    --accentSoft: rgba(14,165,164,.18);
-    --accentBorder: rgba(14,165,164,.45);
+    --accent: #D9475A;
+    --accentHover: rgba(217,71,90,.85);
+    --accentSoft: rgba(217,71,90,.15);
+    --accentBorder: rgba(217,71,90,.35);
 
     --liveBg: rgba(16,185,129,.15);
     --liveBorder: rgba(16,185,129,.4);
@@ -73,10 +73,13 @@
 
 html, body {
     height: 100%;
+    height: 100dvh;
     font-family: var(--sans);
     background: var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 body {
@@ -101,8 +104,8 @@ button:active { transform: scale(0.97); }
 
 input {
     font-family: inherit;
-    font-size: 0.95rem;
-    padding: 0.65rem 0.9rem;
+    font-size: 1rem;
+    padding: 0.75rem 0.9rem;
     border: 1.5px solid var(--border);
     border-radius: calc(var(--radius) * 0.6);
     background: var(--soft);
@@ -123,7 +126,7 @@ input::placeholder { color: var(--muted2); }
     align-items: center;
     justify-content: center;
     gap: 1rem;
-    padding: 1.5rem;
+    padding: 1rem;
 }
 
 .entry-header {
@@ -150,7 +153,7 @@ input::placeholder { color: var(--muted2); }
     border-radius: var(--radius);
     padding: 1.25rem;
     width: 100%;
-    max-width: 420px;
+    max-width: 100%;
 }
 
 .entry-card label {
@@ -176,7 +179,8 @@ input::placeholder { color: var(--muted2); }
     color: #fff;
     font-weight: 600;
     width: 100%;
-    padding: 0.7rem;
+    padding: 0.85rem;
+    font-size: 1rem;
 }
 
 .btn-primary:hover { background: var(--accentHover); }
@@ -287,8 +291,8 @@ input::placeholder { color: var(--muted2); }
 }
 
 .prelive-preview {
-    width: min(70%, calc((100vh - 160px) * 16 / 9 * 0.7));
-    max-width: 840px;
+    width: 100%;
+    max-width: 480px;
     position: relative;
     border-radius: var(--radius);
     overflow: hidden;
@@ -502,33 +506,19 @@ input::placeholder { color: var(--muted2); }
     transition: grid-template-columns 0.25s ease, grid-template-rows 0.25s ease;
 }
 
-/* Grid layouts based on tile count */
+/* Grid layouts — mobile-first (stacked/2-col base) */
 #videoGrid.grid-1 { grid-template-columns: 1fr; place-items: center; }
-#videoGrid.grid-1 .video-tile { width: min(100%, calc((100vh - 140px) * 16 / 9)); }
-#videoGrid.grid-2 { grid-template-columns: 1fr 1fr; width: 100%; }
-#videoGrid.grid-3 { grid-template-columns: 1fr 1fr 1fr; width: 100%; }
+#videoGrid.grid-1 .video-tile { width: 100%; }
+#videoGrid.grid-2 { grid-template-columns: 1fr; width: 100%; }
+#videoGrid.grid-3 { grid-template-columns: 1fr; width: 100%; }
 #videoGrid.grid-4 { grid-template-columns: 1fr 1fr; width: 100%; }
-
-/* 5 tiles: 3 + 2 centered — use 6-column sub-grid */
-#videoGrid.grid-5 { grid-template-columns: repeat(6, 1fr); width: 100%; }
-#videoGrid.grid-5 .video-tile { grid-column: span 2; }
-#videoGrid.grid-5 .video-tile:nth-child(4) { grid-column: 2 / span 2; }
-
-/* 6 tiles: 3 × 2 */
-#videoGrid.grid-6 { grid-template-columns: 1fr 1fr 1fr; width: 100%; }
-
-/* 7 tiles: 4 + 3 centered — use 8-column sub-grid */
-#videoGrid.grid-7 { grid-template-columns: repeat(8, 1fr); width: 100%; }
-#videoGrid.grid-7 .video-tile { grid-column: span 2; }
-#videoGrid.grid-7 .video-tile:nth-child(5) { grid-column: 2 / span 2; }
-
-/* 8 tiles: 4 × 2 */
-#videoGrid.grid-8 { grid-template-columns: 1fr 1fr 1fr 1fr; width: 100%; }
-
-/* Screenshare tiles span 2 columns */
-#videoGrid .video-tile[data-stream-type="screenshare"] {
-    grid-column: span 2;
-}
+#videoGrid.grid-5 { grid-template-columns: 1fr 1fr; width: 100%; }
+#videoGrid.grid-5 .video-tile { grid-column: span 1; }
+#videoGrid.grid-6 { grid-template-columns: 1fr 1fr; width: 100%; }
+#videoGrid.grid-7 { grid-template-columns: 1fr 1fr; width: 100%; }
+#videoGrid.grid-7 .video-tile { grid-column: span 1; }
+#videoGrid.grid-8 { grid-template-columns: 1fr 1fr; width: 100%; }
+#videoGrid .video-tile[data-stream-type="screenshare"] { grid-column: span 1; }
 
 /* ===== Video Tile ===== */
 .video-tile {
@@ -632,12 +622,12 @@ input::placeholder { color: var(--muted2); }
     padding: 0.15rem;
     border-radius: 4px;
     color: var(--accent);
-    background: rgba(14,165,164,.25);
+    background: rgba(191,49,67,.25);
 }
 
 .member-info .indicator {
     color: #fff;
-    background: rgba(14,165,164,.7);
+    background: rgba(191,49,67,.7);
 }
 
 .indicator.off {
@@ -973,35 +963,52 @@ input::placeholder { color: var(--muted2); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ===== Responsive ===== */
-/* 3-tile fallback: 2 + 1 centered when 1×3 would be too cramped */
-@media (min-width: 641px) and (max-width: 768px) {
+/* ===== Responsive — mobile-first ===== */
+/* Mobile base: controls already sized for touch */
+.controls-bar { padding: 0.5rem; gap: 0.4rem; }
+.controls-bar .ctrl-btn { width: 48px; height: 48px; }
+.controls-bar .ctrl-btn svg { width: 22px; height: 22px; }
+.ctrl-btn.leave { margin-left: 0.5rem; }
+.screenshare-area { flex-direction: column; }
+.screenshare-area .video-tile { flex: none; width: 100%; }
+.camera-strip .video-tile { flex: 0 0 120px; width: 120px; }
+
+/* Tablet+ (641px) */
+@media (min-width: 641px) {
+    #videoGrid.grid-2 { grid-template-columns: 1fr 1fr; }
     #videoGrid.grid-3 { grid-template-columns: repeat(4, 1fr); }
     #videoGrid.grid-3 .video-tile { grid-column: span 2; }
     #videoGrid.grid-3 .video-tile:nth-child(3) { grid-column: 2 / span 2; }
+    #videoGrid .video-tile[data-stream-type="screenshare"] { grid-column: span 2; }
+    .camera-strip .video-tile { flex: 0 0 180px; width: 180px; }
+    .screenshare-area { flex-direction: row; }
+    .screenshare-area .video-tile { flex: 1; min-width: 0; width: auto; }
+    .controls-bar { padding: 0.7rem 1rem; gap: 0.6rem; }
+    .ctrl-btn.leave { margin-left: 1rem; }
 }
 
-@media (max-width: 640px) {
-    #videoGrid.grid-2 { grid-template-columns: 1fr; }
-    #videoGrid.grid-3 { grid-template-columns: 1fr; }
-    #videoGrid.grid-4,
-    #videoGrid.grid-6,
-    #videoGrid.grid-8 { grid-template-columns: 1fr 1fr; }
-    #videoGrid.grid-5 { grid-template-columns: 1fr 1fr; }
-    #videoGrid.grid-5 .video-tile { grid-column: span 1; }
-    #videoGrid.grid-5 .video-tile:nth-child(4) { grid-column: auto; }
-    #videoGrid.grid-7 { grid-template-columns: 1fr 1fr; }
-    #videoGrid.grid-7 .video-tile { grid-column: span 1; }
-    #videoGrid.grid-7 .video-tile:nth-child(5) { grid-column: auto; }
-    #videoGrid .video-tile[data-stream-type="screenshare"] { grid-column: span 1; }
-    .screenshare-area { flex-direction: column; }
-    .screenshare-area .video-tile { flex: none; width: 100%; }
-    .camera-strip .video-tile { flex: 0 0 120px; width: 120px; }
+/* Entry card max-width on larger screens */
+@media (min-width: 481px) {
+    .entry-card { max-width: 420px; }
+    #entryScreen { padding: 1.5rem; }
+    .prelive-preview { width: min(70%, calc((100vh - 160px) * 16 / 9 * 0.7)); max-width: 840px; }
+}
 
-    .controls-bar { padding: 0.5rem; gap: 0.4rem; }
-    .controls-bar .ctrl-btn { width: 44px; height: 44px; }
-    .controls-bar .ctrl-btn svg { width: 20px; height: 20px; }
-    .ctrl-btn.leave { margin-left: 0.5rem; }
+/* Desktop (769px+) */
+@media (min-width: 769px) {
+    #videoGrid.grid-1 .video-tile { width: min(100%, calc((100vh - 140px) * 16 / 9)); }
+    #videoGrid.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    #videoGrid.grid-3 .video-tile { grid-column: auto; }
+    #videoGrid.grid-3 .video-tile:nth-child(3) { grid-column: auto; }
+    #videoGrid.grid-5 { grid-template-columns: repeat(6, 1fr); }
+    #videoGrid.grid-5 .video-tile { grid-column: span 2; }
+    #videoGrid.grid-5 .video-tile:nth-child(4) { grid-column: 2 / span 2; }
+    #videoGrid.grid-6 { grid-template-columns: 1fr 1fr 1fr; }
+    #videoGrid.grid-7 { grid-template-columns: repeat(8, 1fr); }
+    #videoGrid.grid-7 .video-tile { grid-column: span 2; }
+    #videoGrid.grid-7 .video-tile:nth-child(5) { grid-column: 2 / span 2; }
+    #videoGrid.grid-8 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .screenshare-area .video-tile { max-width: min(100%, calc((100vh - 220px) * 16 / 9)); max-height: 100%; }
 }
 
 /* ===== Reduced Motion ===== */
@@ -1026,8 +1033,8 @@ input::placeholder { color: var(--muted2); }
 <!-- ===== Entry Screen ===== -->
 <div id="entryScreen" class="screen active">
     <div class="entry-header">
-        <h1>TinyRoom<span id="slugTitle"></span></h1>
-        <p>Video chat for up to 4 people</p>
+        <h1>TinyFamily<span id="slugTitle"></span></h1>
+        <p>Family video chat</p>
     </div>
 
     <div class="entry-card">
@@ -1063,7 +1070,7 @@ input::placeholder { color: var(--muted2); }
 <!-- ===== Pre-Live Screen ===== -->
 <div id="preLiveScreen" class="screen">
     <div class="live-topbar">
-        <h3>TinyRoom</h3>
+        <h3>TinyFamily <span class="role-badge" style="font-size:0.65rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:999px;border:1px solid var(--border);background:var(--soft);color:var(--muted);vertical-align:middle;text-transform:uppercase;letter-spacing:0.04em;"></span></h3>
         <div class="topbar-right">
             <span class="topbar-code" id="preLiveCodeText"></span>
             <button class="topbar-btn" onclick="window.copyRawCode(this)" title="Copy room code">
@@ -1102,7 +1109,7 @@ input::placeholder { color: var(--muted2); }
 <!-- ===== Live Screen ===== -->
 <div id="liveScreen" class="screen">
     <div class="live-topbar">
-        <h3>TinyRoom</h3>
+        <h3>TinyFamily <span class="role-badge" style="font-size:0.65rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:999px;border:1px solid var(--border);background:var(--soft);color:var(--muted);vertical-align:middle;text-transform:uppercase;letter-spacing:0.04em;"></span></h3>
         <div class="topbar-right">
             <span class="topbar-code" id="liveCode"></span>
             <button class="topbar-btn" onclick="window.copyRawCode(this)" title="Copy room code">
@@ -1127,10 +1134,6 @@ input::placeholder { color: var(--muted2); }
         </button>
         <button class="ctrl-btn active" id="liveCamBtn" onclick="window.toggleLiveCam()" title="Camera">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-        </button>
-        <div class="controls-divider"></div>
-        <button class="ctrl-btn" id="liveScreenBtn" onclick="window.toggleLiveScreen()" title="Screen Share">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </button>
         <div class="controls-divider"></div>
         <button class="ctrl-btn leave" onclick="window.leaveRoom()" title="Leave Room">
@@ -1190,6 +1193,7 @@ let isLeavingRoom = false;
 let localName = '';
 let customSlug = '';
 let requiredPin = null;
+let isHost = false;
 
 // ===== Init =====
 VibeLive.init({
@@ -1408,15 +1412,34 @@ function updateAllCodeBadges() {
     const liveBadge = document.getElementById('liveCode');
     preBadge.textContent = displayText;
     liveBadge.textContent = displayText;
-    const tip = customSlug && VibeLive.roomCode
-        ? `${customSlug} (code: ${VibeLive.roomCode}) — click to edit`
-        : 'Click to set a custom room name';
-    preBadge.title = tip;
-    liveBadge.title = tip;
+
+    if (isHost) {
+        const tip = customSlug && VibeLive.roomCode
+            ? `${customSlug} (code: ${VibeLive.roomCode}) — click to edit`
+            : 'Click to set a custom room name';
+        preBadge.title = tip;
+        liveBadge.title = tip;
+        preBadge.style.cursor = 'pointer';
+        liveBadge.style.cursor = 'pointer';
+    } else {
+        preBadge.title = displayText;
+        liveBadge.title = displayText;
+        preBadge.style.cursor = 'default';
+        liveBadge.style.cursor = 'default';
+    }
+
+    // Update role badges
+    document.querySelectorAll('.role-badge').forEach(el => {
+        el.textContent = isHost ? 'Host' : 'Guest';
+        el.style.background = isHost ? 'var(--accentSoft)' : 'var(--soft)';
+        el.style.color = isHost ? 'var(--accent)' : 'var(--muted)';
+        el.style.borderColor = isHost ? 'var(--accentBorder)' : 'var(--border)';
+    });
 }
 
 function makeCodeBadgeEditable(badgeEl) {
     badgeEl.addEventListener('click', () => {
+        if (!isHost) return;
         if (badgeEl.querySelector('input')) return;
 
         const wrapper = document.createElement('div');
@@ -1510,10 +1533,11 @@ window.createRoom = async () => {
 
     btnCreate.disabled = true;
     btnCreate.innerHTML = '<span class="spinner"></span>Creating...';
+    isHost = true;
 
     try {
         await VibeLive.signup(name);
-        const room = await VibeLive.createRoom(`${name}'s Tiny Room`);
+        const room = await VibeLive.createRoom(`${name}'s Family Room`);
         await VibeLive.enterByRoomCode(room.room_code);
     } catch (e) {
         showError(friendlyError(e));
@@ -1538,6 +1562,7 @@ window.joinRoom = async () => {
 
     localName = name;
     btnJoin.disabled = true;
+    isHost = false;
 
     try {
         await VibeLive.signup(name);
@@ -1562,6 +1587,7 @@ window.togglePreMic = () => {
 window.backToEntry = () => {
     isLeavingRoom = true;
     customSlug = '';
+    isHost = false;
     VibeLive.exitRoom();
     document.getElementById('previewArea').innerHTML = '';
 

@@ -1,28 +1,28 @@
-# DESIGN_GUIDE_v2.1
+# Design Guide v2.4
 
-Version: 2.1
-Last updated: 2026-02-18
+Version: 2.4
+Last updated: 2026-03-05
 
 ---
 
 ## Authority & Scope
 
-This document defines **visual, interaction, and layout rules** for MiniChatCore-based apps.
+This document defines **visual, interaction, and layout rules** for VibeLive-based apps.
 
 ### Authority Rule (Important)
 
 When behavior or lifecycle rules conflict:
 
-- **MINI_GUIDE defines system behavior and lifecycle semantics**
-- **DESIGN_GUIDE defines visual presentation and interaction rules**
+- **API Guide** defines system behavior and lifecycle semantics
+- **Design Guide** (this document) defines visual presentation and interaction rules
 
-DESIGN_GUIDE must not override MiniChatCore lifecycle behavior.
+Design Guide must not override VibeLive lifecycle behavior. For visual conflicts, the Design Guide wins.
 
 ---
 
 ## Lifecycle Model (Authoritative)
 
-This guide follows the MiniChatCore lifecycle exactly:
+This guide follows the VibeLive lifecycle exactly:
 
 ```
 PRE-LIVE → LIVE → PRE-LIVE / EXIT
@@ -49,7 +49,7 @@ PRE-LIVE → LIVE → PRE-LIVE / EXIT
 
 ---
 
-## Core Design Philosophy (from v2.0)
+## Core Design Philosophy
 
 1. **Good defaults beat configuration** — if the user does nothing, the UI should still feel right.
 2. **Visual fairness** — participants are equal unless explicitly designed otherwise.
@@ -200,6 +200,7 @@ Rules:
 - No other participants visible
 - Camera off → initials placeholder (stable tile size)
 - **No drag/resize handles** — tile interaction controls (drag handle, resize handle) are hidden in pre-live; they only appear on live room tiles
+- **Element-First Rule**: Both camera and screenshare tiles must be created and registered here (screenshare tile starts hidden with `display: none`). This ensures video elements exist before streams are produced.
 
 ---
 
@@ -231,6 +232,14 @@ When camera is off, show initials inside the placeholder:
 - Video and placeholder are absolute overlays
 - **Hide browser-native video controls** — Chrome and Safari show play/pause overlays on `<video>` elements on hover. Suppress with `::-webkit-media-controls` pseudo-elements set to `display: none !important`
 
+### Grid Containers
+
+Two separate containers are required:
+- **`#cameraGrid`** — for camera tiles
+- **`#screenshareGrid`** — for screenshare tiles (positioned above camera grid)
+
+This keeps them independently styled and positioned — screenshare tiles are typically larger, full-width, or in a separate layout area.
+
 ### Media Indicators
 
 - Default state: cam OFF, mic OFF
@@ -251,7 +260,7 @@ Indicator visibility must be **immediately obvious** at any tile size:
 - **Remote tiles appear when the participant is LIVE or PRE-LIVE** — both active and pre-live members are visible to others
 - **Do NOT remove camera tiles** on LIVE → PRE-LIVE — they may rejoin
 - **Screenshare tiles are ephemeral** — remove entirely when sharing stops (`remoteStreamEnd` for screenshare)
-- Remove camera tiles only when displayStatus = **INACTIVE** or explicit exit
+- Remove camera tiles only when `displayStatus === 'EXITED'`
 
 ---
 
@@ -266,7 +275,7 @@ Indicator visibility must be **immediately obvious** at any tile size:
 
 ### Screen Share Layout Rules
 
-- Each screen share creates a **separate tile** inside a shared `.screenshare-area` container
+- Each screen share creates a **separate tile** inside a shared `.screenshare-area` / `#screenshareGrid` container
 - Camera tiles always remain visible in the strip below
 - Screen share tiles divide the available area equally (flexbox `flex: 1`)
 - Each screen share must preserve its native aspect ratio
@@ -287,6 +296,7 @@ Indicator visibility must be **immediately obvious** at any tile size:
   - Show a **name label** identifying whose screen is being shared (e.g. "April's Screen", "Your Screen")
   - Show **LIVE badge** (same styling as camera tiles)
   - Do NOT show mic/camera indicators
+- Local user sees **"Your Screen"**; remote users see **"Name's Screen"**
 - Screen share is content with ownership attribution
 
 ### Screen Share Transitions
@@ -371,7 +381,7 @@ Notes:
 ### Three-Participant Layout Rule
 
 Default behavior (desktop):
-- Use a single-row layout (1 × 3)
+- Use a single-row layout (1 x 3)
 - All tiles equal size
 - Group centered
 
@@ -440,6 +450,64 @@ When the user leaves a room:
 - All video tiles must be destroyed
 - Camera and mic preview must be released
 - Room state is fully reset — the user can start or join a new room immediately
+
+---
+
+## Session-Ended Modal (Kicked)
+
+When the server ends a meeting (e.g. trial time limit), the app must show a **styled modal** — never a native browser `alert()`.
+
+### Modal Design
+
+- **Overlay**: Full-screen fixed overlay using `--overlay` background, `z-index: 9999`
+- **Card**: Centered, max-width `340px`, `90%` width, using `--card` background with `--radius` border-radius
+- **Title**: "Session ended" — `14px`, `font-weight: 600`, `--text` color
+- **Message**: Server-provided message or fallback text — `13px`, `--muted` color, `line-height: 1.5`, supports multi-line (`white-space: pre-line`)
+- **Button**: Single "OK" button — `--accent` background, white text, `--radius` minus 6px border-radius, `font-weight: 600`
+- **Shadow**: `0 8px 32px rgba(0,0,0,.18)`
+
+### Reference HTML
+
+```html
+<!-- Kicked Modal -->
+<div id="kickedOverlay" style="display:none; position:fixed; inset:0;
+    background:var(--overlay); z-index:9999;
+    align-items:center; justify-content:center;">
+    <div style="background:var(--card); border-radius:16px;
+        padding:28px 24px 20px; max-width:340px; width:90%;
+        box-shadow:0 8px 32px rgba(0,0,0,.18); text-align:center;">
+        <div style="font-size:14px; font-weight:600; color:var(--text);
+            margin-bottom:16px;" id="kickedTitle">Session ended</div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.5;
+            margin-bottom:24px; white-space:pre-line;"
+            id="kickedMessage"></div>
+        <button onclick="closeKickedModal()"
+            style="background:var(--accent); color:#fff; border:none;
+            border-radius:10px; padding:10px 32px; font-size:14px;
+            font-weight:600; cursor:pointer;">OK</button>
+    </div>
+</div>
+```
+
+```javascript
+// Show modal
+function showKickedModal(message) {
+    document.getElementById('kickedMessage').textContent =
+        message || 'You have been removed from the meeting.';
+    document.getElementById('kickedOverlay').style.display = 'flex';
+}
+
+// Dismiss modal
+function closeKickedModal() {
+    document.getElementById('kickedOverlay').style.display = 'none';
+}
+```
+
+### Behavior
+
+- Modal appears after all media cleanup is complete
+- Dismissing returns to the entry screen
+- All video tiles and preview must already be cleared before the modal appears
 
 ---
 
@@ -528,17 +596,17 @@ Accessibility:
 
 ## Summary
 
-- MINI_GUIDE controls behavior
-- DESIGN_GUIDE controls UI
+- API Guide controls behavior
+- Design Guide controls UI
 - PRE-LIVE ≠ EXIT
 - Camera tiles persist across LIVE ⇄ PRE-LIVE; screenshare tiles removed on stream end
 - Remote members visible in both LIVE and PRE-LIVE states
 - Screen share tiles show name label and LIVE badge, but no mic/camera indicators
 - Media indicators always visible
 - Screen share = separate tile
+- Session-ended modal = styled card, never native alert
 - Calm, human-first design
 
 ---
 
-End of DESIGN_GUIDE_v2.1
-
+End of Design Guide v2.4
