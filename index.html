@@ -2428,17 +2428,12 @@ function updateLocalControlUI() {
     // Live buttons
     const liveCamBtn = document.getElementById('liveCamBtn');
     const liveMicBtn = document.getElementById('liveMicBtn');
-    const liveScreenBtn = document.getElementById('liveScreenBtn');
-
     liveCamBtn.classList.toggle('active', camOn);
     liveCamBtn.classList.toggle('off', !camOn);
     liveCamBtn.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
     liveMicBtn.classList.toggle('active', micOn);
     liveMicBtn.classList.toggle('off', !micOn);
     liveMicBtn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
-    liveScreenBtn.classList.toggle('active', screenOn);
-    liveScreenBtn.classList.toggle('off', !screenOn);
-    liveScreenBtn.innerHTML = screenOn ? ICONS.screenOn : ICONS.screenOff;
 }
 </script>
 </body>
