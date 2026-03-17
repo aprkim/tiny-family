@@ -1230,12 +1230,11 @@ let isHost = false;
 
 // ===== Init =====
 VibeLive.init({
-    contextId: 'trial_QtswbmnodMCC',
-    proxy: 'https://tinyroom-proxy.aprkim.workers.dev'
+    contextId: 'trial_QtswbmnodMCC'
 });
 
 function initTheme() {
-    const saved = localStorage.getItem('tinyroom-theme');
+    const saved = localStorage.getItem('tinyfamily-theme');
     if (saved) {
         document.documentElement.setAttribute('data-theme', saved);
     } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
@@ -1255,7 +1254,7 @@ window.toggleTheme = () => {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const next = isDark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('tinyroom-theme', next);
+    localStorage.setItem('tinyfamily-theme', next);
     updateThemeIcon();
 };
 
