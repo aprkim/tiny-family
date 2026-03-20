@@ -2077,14 +2077,8 @@ VibeLive.on('localJoined', async () => {
         document.getElementById('cameraGrid').appendChild(localCamTile);
     }
 
-    const members = await VibeLive.getMembers();
-    members.forEach(m => {
-        if (m.id === VibeLive.memberId) return;
-        if (m.displayStatus === 'LIVE') {
-            const tile = createVideoTile(m.id, m.displayName, 'camera', false);
-            if (tile) document.getElementById('cameraGrid').appendChild(tile);
-        }
-    });
+    // Don't create remote tiles here — let remoteStreamStart handle it.
+    // getMembers() can return stale members from previous sessions.
 
     updateGridLayout();
     updateLocalControlUI();
