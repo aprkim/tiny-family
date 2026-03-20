@@ -1050,14 +1050,6 @@ input::placeholder { color: var(--muted2); }
 
         <div class="prelive-notice">You are not live yet — only you can see this preview</div>
 
-        <div id="roomNameSection" style="display:none; width:100%; max-width:360px;">
-            <div style="display:flex; gap:0.4rem; align-items:center;">
-                <input type="text" id="roomNameInput" placeholder="e.g. hazel" maxlength="20" style="flex:1; font-size:16px; padding:0.5rem 0.7rem; text-transform:lowercase;">
-                <button onclick="window.setRoomName()" class="btn-primary" style="flex:0 0 auto; padding:0.5rem 1rem; font-size:0.85rem; width:auto;">Set Name</button>
-            </div>
-            <div style="font-size:0.72rem; color:var(--muted); margin-top:0.3rem;">Set a custom link so family can join at <span style="color:var(--accent);">family.tinywins.space/<span id="roomNamePreview">name</span></span></div>
-        </div>
-
         <div class="prelive-controls">
             <button class="ctrl-btn active" id="preCamBtn" onclick="window.togglePreCam()" title="Camera">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
@@ -1342,10 +1334,21 @@ function updateAllCodeBadges() {
     const liveBadge = document.getElementById('liveCode');
     preBadge.textContent = displayText;
     liveBadge.textContent = displayText;
-    preBadge.title = customRoomName
-        ? `${customRoomName} (code: ${VibeLive.roomCode})`
-        : displayText;
-    liveBadge.title = preBadge.title;
+
+    if (isHost) {
+        const tip = customRoomName
+            ? `${customRoomName} (code: ${VibeLive.roomCode}) — tap to edit`
+            : 'Tap to set a custom room name';
+        preBadge.title = tip;
+        liveBadge.title = tip;
+        preBadge.style.cursor = 'pointer';
+        liveBadge.style.cursor = 'pointer';
+    } else {
+        preBadge.title = displayText;
+        liveBadge.title = displayText;
+        preBadge.style.cursor = 'default';
+        liveBadge.style.cursor = 'default';
+    }
 
     // Update role badges
     document.querySelectorAll('.role-badge').forEach(el => {
@@ -1406,44 +1409,80 @@ window.togglePreMic = () => {
     try { VibeLive.toggleMuteAudio(); } catch (e) { console.warn('toggleMuteAudio:', e); }
 };
 
-// ===== Custom Room Name =====
-const roomNameInput = document.getElementById('roomNameInput');
-roomNameInput?.addEventListener('input', () => {
-    const val = roomNameInput.value.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 20);
-    roomNameInput.value = val;
-    document.getElementById('roomNamePreview').textContent = val || 'name';
-});
+// ===== Click-to-Edit Room Name =====
+function makeCodeEditable(badgeEl) {
+    badgeEl.addEventListener('click', () => {
+        if (!isHost) return;
+        if (badgeEl.querySelector('input')) return;
 
-window.setRoomName = async () => {
-    const name = roomNameInput.value.trim().toLowerCase();
-    if (!name || !VibeLive.roomCode) return;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'topbar-code-edit';
+        input.value = customRoomName || '';
+        input.placeholder = VibeLive.roomCode || 'custom-name';
+        input.maxLength = 20;
+        input.style.textTransform = 'lowercase';
 
-    if (!/^[a-z0-9][a-z0-9-]{0,19}$/.test(name)) {
-        showError('Use lowercase letters, numbers, and hyphens (1-20 chars)');
-        return;
-    }
+        badgeEl.textContent = '';
+        badgeEl.style.padding = '0';
+        badgeEl.style.background = 'none';
+        badgeEl.style.border = 'none';
+        badgeEl.appendChild(input);
+        input.focus();
+        input.select();
 
-    try {
-        const res = await fetch(`${ROOMS_API}/api/rooms/${name}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomCode: VibeLive.roomCode })
-        });
+        let committed = false;
+        async function commit() {
+            if (committed) return;
+            committed = true;
 
-        if (res.status === 409) {
-            showError(`"${name}" is already taken`);
-            return;
+            const raw = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 20);
+
+            // Restore badge styling
+            badgeEl.style.padding = '';
+            badgeEl.style.background = '';
+            badgeEl.style.border = '';
+
+            if (raw && VibeLive.roomCode && /^[a-z0-9][a-z0-9-]{0,19}$/.test(raw)) {
+                try {
+                    const res = await fetch(`${ROOMS_API}/api/rooms/${raw}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ roomCode: VibeLive.roomCode })
+                    });
+
+                    if (res.status === 409) {
+                        showError(`"${raw}" is already taken`);
+                        updateAllCodeBadges();
+                        return;
+                    }
+                    if (!res.ok) throw new Error('Failed');
+
+                    customRoomName = raw;
+                    updateAllCodeBadges();
+                    showToast(`Link set: family.tinywins.space/${raw}`);
+                    return;
+                } catch (e) {
+                    showError('Could not set room name');
+                }
+            }
+
+            updateAllCodeBadges();
         }
-        if (!res.ok) throw new Error('Failed');
 
-        customRoomName = name;
-        updateAllCodeBadges();
-        document.getElementById('roomNameSection').style.display = 'none';
-        showToast(`Room link set: family.tinywins.space/${name}`);
-    } catch (e) {
-        showError('Could not set room name');
-    }
-};
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); committed = true; updateAllCodeBadges(); }
+        });
+        input.addEventListener('blur', () => commit());
+        input.addEventListener('input', () => {
+            input.value = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+        });
+    });
+}
+
+makeCodeEditable(document.getElementById('preLiveCodeText'));
+makeCodeEditable(document.getElementById('liveCode'));
 
 // ===== Shared Teardown =====
 function teardown() {
@@ -1460,7 +1499,6 @@ function teardown() {
     hideResetButton();
     isHost = false;
     customRoomName = null;
-    document.getElementById('roomNameSection').style.display = 'none';
 
     showScreen('entryScreen');
     // Restore entry UI if it was hidden for slug join
@@ -1922,14 +1960,6 @@ function updateMemberIndicators(memberId, streamType) {
 // ===== Event Handlers =====
 VibeLive.on('channelSelected', async (channel) => {
     updateAllCodeBadges();
-
-    // Show room name input for host if no custom name set yet
-    const roomNameSection = document.getElementById('roomNameSection');
-    if (isHost && !customRoomName) {
-        roomNameSection.style.display = '';
-    } else {
-        roomNameSection.style.display = 'none';
-    }
 
     showScreen('preLiveScreen');
 
