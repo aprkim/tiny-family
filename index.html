@@ -1024,9 +1024,9 @@ input::placeholder { color: var(--muted2); }
             <input type="text" id="codeInput" placeholder="E.G. ABC123" maxlength="12" autocomplete="off">
             <button id="btnJoin" class="btn-join btn-secondary" onclick="window.joinRoom()">Join</button>
         </div>
-        <div id="pinSection" style="display:none; margin-top:0.5rem;">
-            <label for="pinInput" style="font-size:0.85rem;font-weight:500;color:var(--muted);margin-bottom:0.35rem;display:block;">Enter PIN to join</label>
-            <input type="tel" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="text-align:center;letter-spacing:0.2em;font-size:16px;">
+        <div id="pinSection" class="entry-join-row" style="display:none; margin-top:0.5rem;">
+            <input type="tel" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="flex:1;text-align:center;letter-spacing:0.2em;font-size:16px;">
+            <button id="btnPinJoin" class="btn-join btn-primary" onclick="window.joinRoom()">Join</button>
         </div>
     </div>
 </div>
@@ -1253,11 +1253,13 @@ if (urlRoom && !urlCode) {
             codeInput.value = data.roomCode;
             codeInput.disabled = false;
             codeInput.style.display = 'none';
-            btnJoin.classList.remove('btn-secondary');
-            btnJoin.classList.add('btn-primary');
             if (data.pin) {
                 requiredPin = data.pin;
                 document.getElementById('pinSection').style.display = '';
+                btnJoin.style.display = 'none';
+            } else {
+                btnJoin.classList.remove('btn-secondary');
+                btnJoin.classList.add('btn-primary');
             }
             updateEntryButtons();
         })
@@ -1574,6 +1576,7 @@ function teardown() {
     codeInput.value = '';
     codeInput.disabled = false;
     codeInput.style.display = '';
+    btnJoin.style.display = '';
     btnCreate.disabled = false;
     btnCreate.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a Room';
     btnJoin.disabled = false;
