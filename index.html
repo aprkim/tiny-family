@@ -1061,6 +1061,9 @@ input::placeholder { color: var(--muted2); }
             <button class="ctrl-btn active" id="preMicBtn" onclick="window.togglePreMic()" title="Microphone">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             </button>
+            <button class="ctrl-btn" onclick="window.flipCamera()" title="Flip Camera">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16v4a2 2 0 0 1-2 2h-4"/><polyline points="14 22 20 22 20 16"/><path d="M4 8V4a2 2 0 0 1 2-2h4"/><polyline points="10 2 4 2 4 8"/><path d="M16 2l6 6"/><path d="M2 16l6 6"/></svg>
+            </button>
         </div>
 
         <div class="prelive-actions">
@@ -1098,6 +1101,9 @@ input::placeholder { color: var(--muted2); }
         </button>
         <button class="ctrl-btn active" id="liveCamBtn" onclick="window.toggleLiveCam()" title="Camera">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </button>
+        <button class="ctrl-btn" id="flipCamBtn" onclick="window.flipCamera()" title="Flip Camera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16v4a2 2 0 0 1-2 2h-4"/><polyline points="14 22 20 22 20 16"/><path d="M4 8V4a2 2 0 0 1 2-2h4"/><polyline points="10 2 4 2 4 8"/><path d="M16 2l6 6"/><path d="M2 16l6 6"/></svg>
         </button>
         <div class="controls-divider"></div>
         <button class="ctrl-btn leave" onclick="window.leaveRoom()" title="Leave Room">
@@ -1604,6 +1610,31 @@ window.toggleLiveMic = () => {
 
 window.toggleLiveCam = () => {
     VibeLive.toggleVideo();
+};
+
+// ===== Flip Camera (front/rear) =====
+let currentFacingMode = 'user';
+
+window.flipCamera = async () => {
+    try {
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: currentFacingMode } },
+            audio: false
+        });
+        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+        if (camTile) {
+            const video = camTile.querySelector('video');
+            if (video) {
+                video.srcObject = stream;
+                video.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+                VibeLive.setLocalCamera(video);
+            }
+        }
+    } catch (e) {
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        showToast('Could not switch camera');
+    }
 };
 
 // ===== Leave Room =====
