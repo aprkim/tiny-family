@@ -499,15 +499,6 @@ input::placeholder { color: var(--muted2); }
 }
 
 /* ===== Video Grid ===== */
-#screenshareGrid {
-    display: grid;
-    gap: 8px;
-    padding: 8px 8px 0;
-}
-#screenshareGrid:empty {
-    display: none;
-}
-
 #cameraGrid {
     flex: 1;
     display: grid;
@@ -808,55 +799,6 @@ input::placeholder { color: var(--muted2); }
 .video-tile.tile-resized::before { display: none; }
 .video-tile.tile-resizing { z-index: 50; transition: none; }
 
-/* ===== Presentation Mode (screenshare active) ===== */
-#cameraGrid.presentation {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-    place-items: center;
-    transition: grid-template-rows 0.3s ease;
-}
-
-/* Screenshare area: holds one or more screenshare tiles side by side */
-.screenshare-area {
-    grid-column: 1;
-    grid-row: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-}
-
-.screenshare-area .video-tile {
-    flex: 1;
-    min-width: 0;
-    max-width: min(100%, calc((100vh - 220px) * 16 / 9));
-    max-height: 100%;
-}
-
-/* Letterboxing for screenshare — content, not cropped */
-.screenshare-area .video-tile .video-container video {
-    object-fit: contain;
-    background: #000;
-}
-
-/* Screen share tile semantics: no name, no indicators */
-.screenshare-area .video-tile .member-info {
-    display: none;
-}
-
-/* Spotlighted camera tiles in featured area: keep camera behavior */
-.screenshare-area .video-tile.tile-spotlighted .video-container video {
-    object-fit: cover;
-    background: var(--soft);
-}
-
-.screenshare-area .video-tile.tile-spotlighted .member-info {
-    display: flex;
-}
-
 /* Spotlight active indicator */
 .video-tile.tile-spotlighted {
     border: 2px solid var(--accent);
@@ -864,29 +806,6 @@ input::placeholder { color: var(--muted2); }
 
 .video-tile.tile-spotlighted .spotlight-btn {
     background: var(--accent);
-}
-
-/* Camera strip: grid row below screenshare */
-.camera-strip {
-    grid-column: 1;
-    grid-row: 2;
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px 0 0;
-    overflow-x: auto;
-    width: 100%;
-}
-
-.camera-strip .video-tile {
-    flex: 0 0 180px;
-    width: 180px;
-}
-
-#cameraGrid.presentation .video-tile[data-stream-type="camera"].tile-dragged {
-    z-index: 20;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-    border: 2px solid var(--border);
 }
 
 /* Reset layout button */
@@ -985,9 +904,6 @@ input::placeholder { color: var(--muted2); }
 .controls-bar .ctrl-btn { width: 48px; height: 48px; }
 .controls-bar .ctrl-btn svg { width: 22px; height: 22px; }
 .ctrl-btn.leave { margin-left: 0.5rem; }
-.screenshare-area { flex-direction: column; }
-.screenshare-area .video-tile { flex: none; width: 100%; }
-.camera-strip .video-tile { flex: 0 0 120px; width: 120px; }
 
 /* Mobile landscape */
 @media (orientation: landscape) and (max-height: 500px) {
@@ -1017,8 +933,6 @@ input::placeholder { color: var(--muted2); }
     #cameraGrid.grid-3 .video-tile::before { display: block; }
     #cameraGrid.grid-3 .video-tile { grid-column: span 2; }
     #cameraGrid.grid-3 .video-tile:nth-child(3) { grid-column: 2 / span 2; }
-    .camera-strip .video-tile { flex: 0 0 180px; width: 180px; }
-    .screenshare-area .video-tile { flex: 1; min-width: 0; width: auto; }
     .controls-bar { padding: 0.7rem 1rem; gap: 0.6rem; }
     .ctrl-btn.leave { margin-left: 1rem; }
 }
@@ -1044,7 +958,6 @@ input::placeholder { color: var(--muted2); }
     #cameraGrid.grid-7 .video-tile { grid-column: span 2; }
     #cameraGrid.grid-7 .video-tile:nth-child(5) { grid-column: 2 / span 2; }
     #cameraGrid.grid-8 { grid-template-columns: 1fr 1fr 1fr 1fr; }
-    .screenshare-area .video-tile { max-width: min(100%, calc((100vh - 220px) * 16 / 9)); max-height: 100%; }
 }
 
 /* ===== Reduced Motion ===== */
@@ -1157,7 +1070,6 @@ input::placeholder { color: var(--muted2); }
     </div>
 
     <div class="live-body">
-        <div id="screenshareGrid"></div>
         <div id="cameraGrid"></div>
     </div>
 
@@ -1167,9 +1079,6 @@ input::placeholder { color: var(--muted2); }
         </button>
         <button class="ctrl-btn active" id="liveCamBtn" onclick="window.toggleLiveCam()" title="Camera">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-        </button>
-        <button class="ctrl-btn" id="liveScreenBtn" onclick="window.toggleLiveScreen()" title="Share Screen">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </button>
         <div class="controls-divider"></div>
         <button class="ctrl-btn leave" onclick="window.leaveRoom()" title="Leave Room">
@@ -1197,8 +1106,6 @@ const ICONS = {
     camOff:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
     micOn:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
     micOff:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.35 2.17"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
-    screenOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
-    screenOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="2" y1="2" x2="22" y2="18"/></svg>',
 };
 
 // ===== State =====
@@ -1436,14 +1343,12 @@ window.togglePreMic = () => {
 // ===== Shared Teardown =====
 function teardown() {
     // Remove all remote tiles
-    document.querySelectorAll('#cameraGrid .video-tile, #screenshareGrid .video-tile').forEach(tile => {
+    document.querySelectorAll('#cameraGrid .video-tile').forEach(tile => {
         if (tile.dataset.isLocal !== 'true') tile.remove();
     });
-    // Remove local tiles from grids
+    // Remove local tile from grid
     const localCam = document.getElementById(`tile-${VibeLive.memberId}-camera`);
     if (localCam) localCam.remove();
-    const localScreen = document.getElementById(`tile-${VibeLive.memberId}-screenshare`);
-    if (localScreen) localScreen.remove();
     // Remove preview tiles
     document.getElementById('previewArea').querySelectorAll('.video-tile').forEach(t => t.remove());
 
@@ -1489,23 +1394,6 @@ window.toggleLiveCam = () => {
     VibeLive.toggleVideo();
 };
 
-window.toggleLiveScreen = () => {
-    const screenTileId = `tile-${VibeLive.memberId}-screenshare`;
-    let existingTile = document.getElementById(screenTileId);
-
-    // Ensure tile exists before starting (Element-First Rule)
-    if (!existingTile) {
-        const tile = createVideoTile(VibeLive.memberId, localName, 'screenshare', true);
-        if (tile) {
-            tile.style.display = 'none';
-            document.getElementById('screenshareGrid').appendChild(tile);
-        }
-    }
-
-    // Let localMediaChange handle showing/removing the tile
-    VibeLive.toggleScreenshare();
-};
-
 // ===== Leave Room =====
 window.leaveRoom = async () => {
     isLeavingRoom = true;
@@ -1541,7 +1429,7 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     const video = document.createElement('video');
     video.autoplay = true;
     video.playsInline = true;
-    video.muted = (isLocal || streamType === 'screenshare');
+    video.muted = isLocal;
     if (isLocal && streamType === 'camera') {
         video.style.transform = 'scaleX(-1)';
     }
@@ -1551,24 +1439,14 @@ function createVideoTile(memberId, name, streamType, isLocal) {
 
     const memberInfo = document.createElement('div');
     memberInfo.className = 'member-info';
-    if (streamType === 'camera') {
-        memberInfo.innerHTML = `
-            <span class="member-name">${isLocal ? name + ' (You)' : name}</span>
-            <div class="member-indicators">
-                <span class="status-badge"></span>
-                <span class="indicator cam-video" title="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span>
-                <span class="indicator cam-audio" title="Mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
-            </div>
-        `;
-    } else {
-        memberInfo.innerHTML = `
-            <span class="member-name">${isLocal ? 'Your Screen' : name + "'s Screen"}</span>
-            <div class="member-indicators">
-                <span class="status-badge live">LIVE</span>
-                <span class="indicator screen-video" title="Screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
-            </div>
-        `;
-    }
+    memberInfo.innerHTML = `
+        <span class="member-name">${isLocal ? name + ' (You)' : name}</span>
+        <div class="member-indicators">
+            <span class="status-badge"></span>
+            <span class="indicator cam-video" title="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span>
+            <span class="indicator cam-audio" title="Mic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+        </div>
+    `;
 
     tile.appendChild(videoContainer);
     tile.appendChild(memberInfo);
@@ -1602,29 +1480,9 @@ function createVideoTile(memberId, name, streamType, isLocal) {
         tile.appendChild(tileActions);
     }
 
-    // Fullscreen button for screenshare tiles
-    if (streamType === 'screenshare') {
-        const tileActions = document.createElement('div');
-        tileActions.className = 'tile-actions';
-        const fullscreenBtn = document.createElement('button');
-        fullscreenBtn.className = 'tile-action-btn';
-        fullscreenBtn.title = 'Toggle fullscreen';
-        fullscreenBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
-        fullscreenBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleTileFullscreen(tile, fullscreenBtn);
-        });
-        tileActions.appendChild(fullscreenBtn);
-        tile.appendChild(tileActions);
-    }
-
-    // Register local elements immediately (Element-First Rule)
+    // Register local camera element immediately (Element-First Rule)
     if (isLocal) {
-        if (streamType === 'camera') {
-            VibeLive.setLocalCamera(video);
-        } else {
-            VibeLive.setLocalScreen(video);
-        }
+        VibeLive.setLocalCamera(video);
     }
 
     return tile;
@@ -1946,22 +1804,6 @@ function updateMemberIndicators(memberId, streamType) {
         }
     }
 
-    // Screenshare tile indicator
-    const screenTile = document.getElementById(`tile-${memberId}-screenshare`);
-    if (screenTile) {
-        let screenOn;
-        if (isLocal) {
-            screenOn = VibeLive.screenState.video;
-        } else {
-            const states = VibeLive.getMediaStates(memberId);
-            screenOn = states?.screen_video_detail === 'ON';
-        }
-        const screenInd = screenTile.querySelector('.screen-video');
-        if (screenInd) {
-            screenInd.classList.toggle('off', !screenOn);
-            screenInd.innerHTML = screenOn ? ICONS.screenOn : ICONS.screenOff;
-        }
-    }
 }
 
 // ===== Event Handlers =====
@@ -1975,12 +1817,6 @@ VibeLive.on('channelSelected', async (channel) => {
     if (self) {
         const camTile = createVideoTile(self.id, self.displayName, 'camera', true);
         if (camTile) document.getElementById('previewArea').appendChild(camTile);
-
-        const screenTile = createVideoTile(self.id, self.displayName, 'screenshare', true);
-        if (screenTile) {
-            screenTile.style.display = 'none';
-            document.getElementById('screenshareGrid').appendChild(screenTile);
-        }
     }
 
     await VibeLive.toggleVideo();
@@ -2011,7 +1847,7 @@ VibeLive.on('localJoined', async () => {
 VibeLive.on('localLeft', () => {
     if (isLeavingRoom) return;
 
-    document.querySelectorAll('#cameraGrid .video-tile, #screenshareGrid .video-tile').forEach(tile => {
+    document.querySelectorAll('#cameraGrid .video-tile').forEach(tile => {
         if (tile.dataset.memberId !== VibeLive.memberId) {
             tile.remove();
         }
@@ -2038,7 +1874,6 @@ VibeLive.on('remoteLeft', (memberId) => {
     const m = VibeLive.getMember(memberId);
     if (m?.displayStatus === 'EXITED') {
         document.getElementById(`tile-${memberId}-camera`)?.remove();
-        document.getElementById(`tile-${memberId}-screenshare`)?.remove();
         updateGridLayout();
     }
 });
@@ -2057,17 +1892,15 @@ VibeLive.on('memberUpdate', (memberId) => {
 
 VibeLive.on('remoteStreamStart', (memberId, streamType) => {
     if (!VibeLive.isLive) return;
+    if (streamType === 'screenshare') return; // screenshare not supported
 
     const m = VibeLive.getMember(memberId);
-    const tileId = `tile-${memberId}-${streamType}`;
+    const tileId = `tile-${memberId}-camera`;
     let tile = document.getElementById(tileId);
 
     if (!tile) {
-        tile = createVideoTile(memberId, m?.displayName || 'Unknown', streamType, false);
-        if (tile) {
-            const targetGrid = streamType === 'screenshare' ? 'screenshareGrid' : 'cameraGrid';
-            document.getElementById(targetGrid).appendChild(tile);
-        }
+        tile = createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
+        if (tile) document.getElementById('cameraGrid').appendChild(tile);
     }
 
     if (!tile) return;
@@ -2078,50 +1911,37 @@ VibeLive.on('remoteStreamStart', (memberId, streamType) => {
     if (placeholder) placeholder.classList.add('hidden');
     if (video) {
         video.classList.add('visible');
-        if (streamType === 'camera') {
-            VibeLive.setRemoteCamera(memberId, video);
-        } else {
-            VibeLive.setRemoteScreen(memberId, video);
-        }
+        VibeLive.setRemoteCamera(memberId, video);
     }
 
     updateGridLayout();
-    updateMemberIndicators(memberId, streamType);
+    updateMemberIndicators(memberId);
 });
 
 VibeLive.on('remoteStreamEnd', (memberId, streamType) => {
-    const tileId = `tile-${memberId}-${streamType}`;
-    const tile = document.getElementById(tileId);
+    if (streamType === 'screenshare') return;
+    const tile = document.getElementById(`tile-${memberId}-camera`);
     if (!tile) return;
 
-    if (streamType === 'screenshare') {
-        tile.remove();
-    } else {
-        const video = tile.querySelector('video');
-        const placeholder = tile.querySelector('.video-placeholder');
-        if (video) video.classList.remove('visible');
-        if (placeholder) placeholder.classList.remove('hidden');
-    }
+    const video = tile.querySelector('video');
+    const placeholder = tile.querySelector('.video-placeholder');
+    if (video) video.classList.remove('visible');
+    if (placeholder) placeholder.classList.remove('hidden');
 
     updateGridLayout();
-    updateMemberIndicators(memberId, streamType);
+    updateMemberIndicators(memberId);
 });
 
 VibeLive.on('remoteMediaChange', (memberId, streamType) => {
+    if (streamType === 'screenshare') return;
     const states = VibeLive.getMediaStates(memberId);
-    const tileId = `tile-${memberId}-${streamType}`;
-    const tile = document.getElementById(tileId);
+    const tile = document.getElementById(`tile-${memberId}-camera`);
     if (!tile) return;
 
     const video = tile.querySelector('video');
     const placeholder = tile.querySelector('.video-placeholder');
 
-    let showPlaceholder = false;
-    if (streamType === 'camera') {
-        showPlaceholder = states.cam_video_detail !== 'ON';
-    } else {
-        showPlaceholder = states.screen_video_detail !== 'ON';
-    }
+    const showPlaceholder = states.cam_video_detail !== 'ON';
 
     if (showPlaceholder) {
         video?.classList.remove('visible');
@@ -2136,7 +1956,6 @@ VibeLive.on('remoteMediaChange', (memberId, streamType) => {
 
 VibeLive.on('localMediaChange', () => {
     const s = VibeLive.mediaState;
-    const screen = VibeLive.screenState;
 
     const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
     if (camTile) {
@@ -2148,17 +1967,6 @@ VibeLive.on('localMediaChange', () => {
         } else {
             placeholder?.classList.remove('hidden');
             video?.classList.remove('visible');
-        }
-    }
-
-    const screenTile = document.getElementById(`tile-${VibeLive.memberId}-screenshare`);
-    if (screenTile) {
-        if (screen.video) {
-            screenTile.style.display = 'flex';
-            screenTile.querySelector('.video-placeholder')?.classList.add('hidden');
-            screenTile.querySelector('video')?.classList.add('visible');
-        } else {
-            screenTile.style.display = 'none';
         }
     }
 
@@ -2191,11 +1999,9 @@ window.closeKickedModal = () => {
 // ===== Update Control Button States =====
 function updateLocalControlUI() {
     const s = VibeLive.mediaState;
-    const screen = VibeLive.screenState;
 
     const camOn = s.video;
     const micOn = s.audio && !s.audioMuted;
-    const screenOn = screen.video;
 
     // Pre-live buttons
     const preCamBtn = document.getElementById('preCamBtn');
@@ -2210,18 +2016,12 @@ function updateLocalControlUI() {
     // Live buttons
     const liveCamBtn = document.getElementById('liveCamBtn');
     const liveMicBtn = document.getElementById('liveMicBtn');
-    const liveScreenBtn = document.getElementById('liveScreenBtn');
     liveCamBtn.classList.toggle('active', camOn);
     liveCamBtn.classList.toggle('off', !camOn);
     liveCamBtn.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
     liveMicBtn.classList.toggle('active', micOn);
     liveMicBtn.classList.toggle('off', !micOn);
     liveMicBtn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
-    if (liveScreenBtn) {
-        liveScreenBtn.classList.toggle('active', screenOn);
-        liveScreenBtn.classList.toggle('off', !screenOn);
-        liveScreenBtn.innerHTML = screenOn ? ICONS.screenOn : ICONS.screenOff;
-    }
 }
 </script>
 </body>
