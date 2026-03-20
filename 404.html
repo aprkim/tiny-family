@@ -6,12 +6,22 @@
   <script>
     (function() {
       var path = window.location.pathname;
-      var match = path.match(/^\/in\/(.+)/);
-      if (match) {
-        var slug = match[1].replace(/\/+$/g, '');
+      var slug = null;
+
+      // /in/hazel (legacy)
+      var match = path.match(/^\/in\/([a-z0-9][a-z0-9-]{0,19})\/?$/);
+      if (match) slug = match[1];
+
+      // /hazel (root-level custom name)
+      if (!slug) {
+        var rootMatch = path.match(/^\/([a-z0-9][a-z0-9-]{0,19})\/?$/);
+        if (rootMatch) slug = rootMatch[1];
+      }
+
+      if (slug) {
         var params = new URLSearchParams(window.location.search);
-        params.set('slug', slug);
-        window.location.replace('/' + '?' + params.toString());
+        params.set('room', slug);
+        window.location.replace('/?' + params.toString());
       } else {
         window.location.replace('/' + window.location.search);
       }
