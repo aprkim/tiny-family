@@ -67,6 +67,10 @@ export default {
         createdAt: new Date().toISOString(),
       };
 
+      if (body.pin && /^\d{4}$/.test(body.pin)) {
+        data.pin = body.pin;
+      }
+
       await env.ROOMS.put(name, JSON.stringify(data), { expirationTtl: TTL });
       return json(data);
     }

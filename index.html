@@ -1024,6 +1024,10 @@ input::placeholder { color: var(--muted2); }
             <input type="text" id="codeInput" placeholder="E.G. ABC123" maxlength="12" autocomplete="off">
             <button id="btnJoin" class="btn-join btn-secondary" onclick="window.joinRoom()">Join</button>
         </div>
+        <div id="pinSection" style="display:none; margin-top:0.5rem;">
+            <label for="pinInput" style="font-size:0.85rem;font-weight:500;color:var(--muted);margin-bottom:0.35rem;display:block;">Enter PIN to join</label>
+            <input type="tel" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="text-align:center;letter-spacing:0.2em;font-size:16px;">
+        </div>
     </div>
 </div>
 
@@ -1131,6 +1135,7 @@ let isLeavingRoom = false;
 let localName = '';
 let isHost = false;
 let customRoomName = null;
+let requiredPin = null;
 
 // ===== Init =====
 VibeLive.init({
@@ -1241,8 +1246,13 @@ if (urlRoom && !urlCode) {
         .then(data => {
             codeInput.value = data.roomCode;
             codeInput.disabled = false;
+            codeInput.style.display = 'none';
             btnJoin.classList.remove('btn-secondary');
             btnJoin.classList.add('btn-primary');
+            if (data.pin) {
+                requiredPin = data.pin;
+                document.getElementById('pinSection').style.display = '';
+            }
             updateEntryButtons();
         })
         .catch(() => {
@@ -1387,6 +1397,14 @@ window.joinRoom = async () => {
     const code = codeInput.value.trim();
     if (!name || !code) return;
 
+    if (requiredPin) {
+        const enteredPin = document.getElementById('pinInput').value.replace(/\D/g, '');
+        if (enteredPin !== requiredPin) {
+            showError('Incorrect PIN');
+            return;
+        }
+    }
+
     localName = name;
     btnJoin.disabled = true;
     isHost = false;
@@ -1416,6 +1434,9 @@ function makeCodeEditable(badgeEl) {
         if (!isHost) return;
         if (badgeEl.querySelector('input')) return;
 
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;gap:4px;align-items:center;';
+
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'topbar-code-edit';
@@ -1424,20 +1445,35 @@ function makeCodeEditable(badgeEl) {
         input.maxLength = 20;
         input.style.textTransform = 'lowercase';
 
+        const pinInput = document.createElement('input');
+        pinInput.type = 'tel';
+        pinInput.className = 'topbar-code-edit';
+        pinInput.value = '';
+        pinInput.placeholder = 'PIN';
+        pinInput.maxLength = 4;
+        pinInput.inputMode = 'numeric';
+        pinInput.pattern = '[0-9]*';
+        pinInput.style.cssText = 'width:56px;min-width:56px;text-align:center;';
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(pinInput);
+
         badgeEl.textContent = '';
         badgeEl.style.padding = '0';
         badgeEl.style.background = 'none';
         badgeEl.style.border = 'none';
-        badgeEl.appendChild(input);
+        badgeEl.appendChild(wrapper);
         input.focus();
         input.select();
 
         let committed = false;
         async function commit() {
             if (committed) return;
+            if (!badgeEl.contains(wrapper)) return;
             committed = true;
 
             const raw = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 20);
+            const pin = pinInput.value.replace(/\D/g, '').substring(0, 4);
 
             // Restore badge styling
             badgeEl.style.padding = '';
@@ -1446,10 +1482,13 @@ function makeCodeEditable(badgeEl) {
 
             if (raw && VibeLive.roomCode && /^[a-z0-9][a-z0-9-]{0,19}$/.test(raw)) {
                 try {
+                    const body = { roomCode: VibeLive.roomCode };
+                    if (pin.length === 4) body.pin = pin;
+
                     const res = await fetch(`${ROOMS_API}/api/rooms/${raw}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ roomCode: VibeLive.roomCode })
+                        body: JSON.stringify(body)
                     });
 
                     if (res.status === 409) {
@@ -1461,7 +1500,7 @@ function makeCodeEditable(badgeEl) {
 
                     customRoomName = raw;
                     updateAllCodeBadges();
-                    showToast(`Link set: family.tinywins.space/${raw}`);
+                    showToast(`Link set: family.tinywins.space/${raw}${pin.length === 4 ? ' (PIN protected)' : ''}`);
                     return;
                 } catch (e) {
                     showError('Could not set room name');
@@ -1471,13 +1510,30 @@ function makeCodeEditable(badgeEl) {
             updateAllCodeBadges();
         }
 
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); commit(); }
-            if (e.key === 'Escape') { e.preventDefault(); committed = true; updateAllCodeBadges(); }
+        function cancel() {
+            committed = true;
+            badgeEl.style.padding = '';
+            badgeEl.style.background = '';
+            badgeEl.style.border = '';
+            updateAllCodeBadges();
+        }
+
+        [input, pinInput].forEach(el => {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commit(); }
+                if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            });
+            el.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (!wrapper.contains(document.activeElement)) commit();
+                }, 100);
+            });
         });
-        input.addEventListener('blur', () => commit());
         input.addEventListener('input', () => {
             input.value = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+        });
+        pinInput.addEventListener('input', () => {
+            pinInput.value = pinInput.value.replace(/\D/g, '');
         });
     });
 }
@@ -1500,14 +1556,18 @@ function teardown() {
     hideResetButton();
     isHost = false;
     customRoomName = null;
+    requiredPin = null;
 
     showScreen('entryScreen');
     // Restore entry UI if it was hidden for slug join
     btnCreate.style.display = '';
     document.querySelector('.entry-divider').style.display = '';
     document.getElementById('codeSection').style.display = '';
+    document.getElementById('pinSection').style.display = 'none';
+    document.getElementById('pinInput').value = '';
     codeInput.value = '';
     codeInput.disabled = false;
+    codeInput.style.display = '';
     btnCreate.disabled = false;
     btnCreate.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a Room';
     btnJoin.disabled = false;
