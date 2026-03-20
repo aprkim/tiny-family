@@ -2080,7 +2080,7 @@ VibeLive.on('localJoined', async () => {
     const members = await VibeLive.getMembers();
     members.forEach(m => {
         if (m.id === VibeLive.memberId) return;
-        if (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE') {
+        if (m.displayStatus === 'LIVE') {
             const tile = createVideoTile(m.id, m.displayName, 'camera', false);
             if (tile) document.getElementById('cameraGrid').appendChild(tile);
         }
