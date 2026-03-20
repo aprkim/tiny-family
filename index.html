@@ -1311,7 +1311,8 @@ function showCopiedTip(btn, text) {
 
 window.copyRawCode = (btn) => {
     if (!VibeLive.roomCode) return;
-    navigator.clipboard.writeText(VibeLive.roomCode).then(() => {
+    const text = customRoomName || VibeLive.roomCode;
+    navigator.clipboard.writeText(text).then(() => {
         if (btn) showCopiedTip(btn, 'Copied!');
     }).catch(() => {});
 };
