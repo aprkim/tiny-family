@@ -1656,15 +1656,16 @@ window.flipCamera = async () => {
             });
         }
 
-        // Stop old tracks AFTER getting new stream
-        if (video.srcObject) {
-            video.srcObject.getVideoTracks().forEach(t => t.stop());
-        }
-
+        const oldStream = video.srcObject;
         video.srcObject = stream;
         usingFrontCamera = !usingFrontCamera;
         video.style.transform = usingFrontCamera ? 'scaleX(-1)' : 'none';
         VibeLive.setLocalCamera(video);
+
+        // Stop old tracks AFTER VibeLive has the new stream
+        if (oldStream) {
+            oldStream.getVideoTracks().forEach(t => t.stop());
+        }
     } catch (e) {
         showToast('Could not switch camera');
     }
