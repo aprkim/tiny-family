@@ -2124,7 +2124,12 @@ VibeLive.on('channelSelected', async (channel) => {
         const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
         if (camTile) {
             const vid = camTile.querySelector('video');
-            if (vid) { vid.srcObject = previewStream; vid.play().catch(() => {}); }
+            if (vid) {
+                vid.srcObject = previewStream;
+                vid.play().catch(() => {});
+                const ph = camTile.querySelector('.video-placeholder');
+                if (ph) ph.classList.add('hidden');
+            }
         }
     } catch (e) { console.warn('Pre-live preview:', e); }
 });
