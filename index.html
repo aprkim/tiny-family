@@ -1605,7 +1605,10 @@ window.goLive = async () => {
     const btn = document.querySelector('.prelive-go');
     if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
     try {
-        await VibeLive.startLive();
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Connection timed out')), 10000)
+        );
+        await Promise.race([VibeLive.startLive(), timeout]);
     } catch (e) {
         showError('Failed to go live: ' + e.message);
     } finally {
@@ -2100,8 +2103,8 @@ VibeLive.on('channelSelected', async (channel) => {
         if (camTile) document.getElementById('previewArea').appendChild(camTile);
     }
 
-    await VibeLive.toggleVideo();
-    await VibeLive.toggleAudio();
+    try { await VibeLive.toggleVideo(); } catch (e) { console.warn('Pre-live toggleVideo:', e); }
+    try { await VibeLive.toggleAudio(); } catch (e) { console.warn('Pre-live toggleAudio:', e); }
 });
 
 VibeLive.on('localJoined', async () => {
