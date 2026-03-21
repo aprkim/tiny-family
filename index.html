@@ -1616,6 +1616,16 @@ let currentFacingMode = 'user';
 
 window.flipCamera = async () => {
     try {
+        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+        if (!camTile) { showToast('No camera tile'); return; }
+        const video = camTile.querySelector('video');
+        if (!video) { showToast('No video element'); return; }
+
+        // Get current track's device ID
+        const currentTrack = video.srcObject?.getVideoTracks()[0];
+        const currentDeviceId = currentTrack?.getSettings()?.deviceId;
+
+        // Find all cameras and pick the next one
         const devices = await navigator.mediaDevices.enumerateDevices();
         const cameras = devices.filter(d => d.kind === 'videoinput');
 
@@ -1624,28 +1634,26 @@ window.flipCamera = async () => {
             return;
         }
 
-        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        const currentIdx = cameras.findIndex(c => c.deviceId === currentDeviceId);
+        const nextCamera = cameras[(currentIdx + 1) % cameras.length];
 
+        // Stop old tracks
+        if (currentTrack) currentTrack.stop();
+
+        // Get new stream using device ID
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: currentFacingMode } },
+            video: { deviceId: { exact: nextCamera.deviceId } },
             audio: false
         });
 
-        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-        if (!camTile) return;
-        const video = camTile.querySelector('video');
-        if (!video) return;
-
-        // Stop old video tracks
-        if (video.srcObject) {
-            video.srcObject.getVideoTracks().forEach(t => t.stop());
-        }
-
         video.srcObject = stream;
-        video.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+        // Mirror front camera only
+        const isFront = nextCamera.label.toLowerCase().includes('front') ||
+                        nextCamera.facingMode === 'user' ||
+                        cameras.indexOf(nextCamera) === 0;
+        video.style.transform = isFront ? 'scaleX(-1)' : 'none';
         VibeLive.setLocalCamera(video);
     } catch (e) {
-        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
         showToast('Could not switch camera');
     }
 };
