@@ -1433,23 +1433,51 @@ window.joinRoom = async () => {
 };
 
 // ===== Pre-Live Controls =====
-window.togglePreCam = () => {
-    try { VibeLive.toggleVideo(); } catch (e) { console.warn('toggleVideo:', e); }
+let preCamOn = true;
+let preMicOn = false;
+
+window.togglePreCam = async () => {
+    preCamOn = !preCamOn;
+    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+    if (!camTile) return;
+    const vid = camTile.querySelector('video');
+    const ph = camTile.querySelector('.video-placeholder');
+
+    if (preCamOn) {
+        try {
+            previewStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' }, audio: false
+            });
+            if (vid) { vid.srcObject = previewStream; vid.classList.add('visible'); vid.play().catch(() => {}); }
+            if (ph) ph.classList.add('hidden');
+        } catch (e) { console.warn('togglePreCam:', e); preCamOn = false; }
+    } else {
+        if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
+        if (vid) { vid.srcObject = null; vid.classList.remove('visible'); }
+        if (ph) ph.classList.remove('hidden');
+    }
+    updatePreLiveButtons();
 };
 
-let audioStarted = false;
 window.togglePreMic = () => {
-    try {
-        if (!audioStarted) {
-            // First tap: start mic capture with toggleAudio()
-            VibeLive.toggleAudio();
-            audioStarted = true;
-        } else {
-            // Subsequent taps: mute/unmute (keeps mic warm, instant)
-            VibeLive.toggleMuteAudio();
-        }
-    } catch (e) { console.warn('togglePreMic:', e); }
+    preMicOn = !preMicOn;
+    updatePreLiveButtons();
 };
+
+function updatePreLiveButtons() {
+    const preCamBtn = document.getElementById('preCamBtn');
+    const preMicBtn = document.getElementById('preMicBtn');
+    if (preCamBtn) {
+        preCamBtn.classList.toggle('active', preCamOn);
+        preCamBtn.classList.toggle('off', !preCamOn);
+        preCamBtn.innerHTML = preCamOn ? ICONS.camOn : ICONS.camOff;
+    }
+    if (preMicBtn) {
+        preMicBtn.classList.toggle('active', preMicOn);
+        preMicBtn.classList.toggle('off', !preMicOn);
+        preMicBtn.innerHTML = preMicOn ? ICONS.micOn : ICONS.micOff;
+    }
+}
 
 // ===== Click-to-Edit Room Name =====
 function makeCodeEditable(badgeEl) {
@@ -1580,7 +1608,9 @@ function teardown() {
     isHost = false;
     customRoomName = null;
     requiredPin = null;
-    audioStarted = false;
+    preCamOn = true;
+    preMicOn = false;
+    if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
 
     showScreen('entryScreen');
     // Restore entry UI if it was hidden for slug join
@@ -1616,10 +1646,20 @@ window.goLive = async () => {
     const btn = document.querySelector('.prelive-go');
     if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
     try {
+        // Stop preview stream before going live
+        if (previewStream) {
+            previewStream.getTracks().forEach(t => t.stop());
+            previewStream = null;
+        }
+
         const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Connection timed out')), 10000)
         );
         await Promise.race([VibeLive.startLive(), timeout]);
+
+        // Start VibeLive media respecting pre-live choices
+        if (preCamOn) await VibeLive.toggleVideo();
+        if (preMicOn) await VibeLive.toggleAudio();
     } catch (e) {
         showError('Failed to go live: ' + e.message);
     } finally {
@@ -2097,6 +2137,8 @@ function updateMemberIndicators(memberId, streamType) {
 }
 
 // ===== Event Handlers =====
+let previewStream = null;
+
 VibeLive.on('channelSelected', async (channel) => {
     updateAllCodeBadges();
 
@@ -2107,38 +2149,29 @@ VibeLive.on('channelSelected', async (channel) => {
     if (self) {
         const camTile = createVideoTile(self.id, self.displayName, 'camera', true);
         if (camTile) {
-            // Append to DOM first, THEN register with VibeLive (Element-First Rule)
             document.getElementById('previewArea').appendChild(camTile);
             const vid = camTile.querySelector('video');
             if (vid) VibeLive.setLocalCamera(vid);
         }
     }
 
-    // Start camera for preview, mic stays OFF until user turns it on
-    try { await VibeLive.toggleVideo(); } catch (e) { console.warn('Pre-live toggleVideo:', e); }
-
-    // Ensure video element is visible for preview
-    const camTilePreview = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-    if (camTilePreview) {
-        const vid = camTilePreview.querySelector('video');
-        const ph = camTilePreview.querySelector('.video-placeholder');
-
-        // On mobile, VibeLive stream may not attach immediately.
-        // Wait briefly, then fallback to direct getUserMedia if needed.
-        setTimeout(async () => {
-            if (vid && (!vid.srcObject || !vid.srcObject.active)) {
-                try {
-                    const fallbackStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'user' }, audio: false
-                    });
-                    vid.srcObject = fallbackStream;
-                    await vid.play();
-                } catch (e) { console.warn('Fallback preview:', e); }
+    // Direct getUserMedia for pre-live preview (works reliably on mobile)
+    try {
+        previewStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' }, audio: false
+        });
+        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+        if (camTile) {
+            const vid = camTile.querySelector('video');
+            const ph = camTile.querySelector('.video-placeholder');
+            if (vid) {
+                vid.srcObject = previewStream;
+                vid.classList.add('visible');
+                await vid.play().catch(() => {});
             }
-            if (vid) vid.classList.add('visible');
             if (ph) ph.classList.add('hidden');
-        }, 500);
-    }
+        }
+    } catch (e) { console.warn('Pre-live preview:', e); }
 });
 
 VibeLive.on('localJoined', async () => {
