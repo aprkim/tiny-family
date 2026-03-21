@@ -1666,6 +1666,10 @@ window.leaveRoom = async () => {
     setTimeout(() => { isLeavingRoom = false; }, 200);
 };
 
+window.addEventListener('beforeunload', () => {
+    if (VibeLive.isLive) VibeLive.exitRoom();
+});
+
 // ===== Video Tile Creation =====
 function createVideoTile(memberId, name, streamType, isLocal) {
     const tileId = `tile-${memberId}-${streamType}`;
