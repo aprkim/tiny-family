@@ -2103,9 +2103,8 @@ VibeLive.on('channelSelected', async (channel) => {
         }
     }
 
-    // Start camera + mic for preview (guide reference: channelSelected lines 852-853)
+    // Start camera for preview, mic stays OFF until user turns it on
     try { await VibeLive.toggleVideo(); } catch (e) { console.warn('Pre-live toggleVideo:', e); }
-    try { await VibeLive.toggleAudio(); } catch (e) { console.warn('Pre-live toggleAudio:', e); }
 
     // Ensure video element is visible for preview
     const camTilePreview = document.getElementById(`tile-${VibeLive.memberId}-camera`);
