@@ -1605,10 +1605,24 @@ window.goLive = async () => {
     const btn = document.querySelector('.prelive-go');
     if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
     try {
+        // Stop pre-live preview stream
+        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+        if (camTile) {
+            const vid = camTile.querySelector('video');
+            if (vid && vid.srcObject) {
+                vid.srcObject.getTracks().forEach(t => t.stop());
+                vid.srcObject = null;
+            }
+        }
+
         const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Connection timed out')), 10000)
         );
         await Promise.race([VibeLive.startLive(), timeout]);
+
+        // startLive() only connects WebRTC — must start audio/video separately
+        await VibeLive.toggleAudio();
+        await VibeLive.toggleVideo();
     } catch (e) {
         showError('Failed to go live: ' + e.message);
     } finally {
@@ -2103,8 +2117,16 @@ VibeLive.on('channelSelected', async (channel) => {
         if (camTile) document.getElementById('previewArea').appendChild(camTile);
     }
 
-    try { await VibeLive.toggleVideo(); } catch (e) { console.warn('Pre-live toggleVideo:', e); }
-    try { await VibeLive.toggleAudio(); } catch (e) { console.warn('Pre-live toggleAudio:', e); }
+    // Don't call toggleVideo/toggleAudio here — they require startLive() first.
+    // Pre-live preview uses getUserMedia directly for camera preview.
+    try {
+        const previewStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+        if (camTile) {
+            const vid = camTile.querySelector('video');
+            if (vid) { vid.srcObject = previewStream; vid.play().catch(() => {}); }
+        }
+    } catch (e) { console.warn('Pre-live preview:', e); }
 });
 
 VibeLive.on('localJoined', async () => {
