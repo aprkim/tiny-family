@@ -1621,27 +1621,23 @@ window.flipCamera = async () => {
         const video = camTile.querySelector('video');
         if (!video) { showToast('No video element'); return; }
 
-        // Get the desired facing mode (opposite of current)
-        const wantFacing = usingFrontCamera ? 'environment' : 'user';
+        const wantBack = usingFrontCamera;
 
         // Get new stream FIRST (before stopping old one)
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: wantFacing },
-            audio: false
-        });
+        // Use exact for back camera, no constraint for front (default)
+        const constraints = wantBack
+            ? { video: { facingMode: { exact: 'environment' } }, audio: false }
+            : { video: true, audio: false };
 
-        // Verify we actually got a different camera
-        const newTrack = stream.getVideoTracks()[0];
-        const newFacing = newTrack.getSettings().facingMode;
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-        // Now stop old tracks
+        // Stop old tracks after we have new stream
         if (video.srcObject) {
             video.srcObject.getVideoTracks().forEach(t => t.stop());
         }
 
-        // Swap in new stream
         video.srcObject = stream;
-        usingFrontCamera = newFacing === 'user' || (!newFacing && !usingFrontCamera);
+        usingFrontCamera = !wantBack;
         video.style.transform = usingFrontCamera ? 'scaleX(-1)' : 'none';
         VibeLive.setLocalCamera(video);
     } catch (e) {
