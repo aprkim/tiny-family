@@ -1778,11 +1778,6 @@ function createVideoTile(memberId, name, streamType, isLocal) {
         tile.appendChild(tileActions);
     }
 
-    // Register local camera element immediately (Element-First Rule)
-    if (isLocal) {
-        VibeLive.setLocalCamera(video);
-    }
-
     return tile;
 }
 
@@ -2114,11 +2109,15 @@ VibeLive.on('channelSelected', async (channel) => {
     const self = members.find(m => m.id === VibeLive.memberId);
     if (self) {
         const camTile = createVideoTile(self.id, self.displayName, 'camera', true);
-        if (camTile) document.getElementById('previewArea').appendChild(camTile);
+        if (camTile) {
+            // Append to DOM first, THEN register with VibeLive (Element-First Rule)
+            document.getElementById('previewArea').appendChild(camTile);
+            const vid = camTile.querySelector('video');
+            if (vid) VibeLive.setLocalCamera(vid);
+        }
     }
 
-    // Don't call toggleVideo/toggleAudio here — they require startLive() first.
-    // Pre-live preview uses getUserMedia directly for camera preview.
+    // Pre-live preview: use getUserMedia directly (toggleVideo requires startLive first)
     try {
         const previewStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
