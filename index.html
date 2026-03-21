@@ -2122,8 +2122,22 @@ VibeLive.on('channelSelected', async (channel) => {
     if (camTilePreview) {
         const vid = camTilePreview.querySelector('video');
         const ph = camTilePreview.querySelector('.video-placeholder');
-        if (vid) vid.classList.add('visible');
-        if (ph) ph.classList.add('hidden');
+
+        // On mobile, VibeLive stream may not attach immediately.
+        // Wait briefly, then fallback to direct getUserMedia if needed.
+        setTimeout(async () => {
+            if (vid && (!vid.srcObject || !vid.srcObject.active)) {
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user' }, audio: false
+                    });
+                    vid.srcObject = fallbackStream;
+                    await vid.play();
+                } catch (e) { console.warn('Fallback preview:', e); }
+            }
+            if (vid) vid.classList.add('visible');
+            if (ph) ph.classList.add('hidden');
+        }, 500);
     }
 });
 
