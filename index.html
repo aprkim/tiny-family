@@ -1612,7 +1612,7 @@ window.toggleLiveCam = () => {
 };
 
 // ===== Flip Camera (front/rear) =====
-let currentFacingMode = 'user';
+let usingFrontCamera = true;
 
 window.flipCamera = async () => {
     try {
@@ -1621,14 +1621,18 @@ window.flipCamera = async () => {
         const video = camTile.querySelector('video');
         if (!video) { showToast('No video element'); return; }
 
-        // Toggle facing mode
-        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+        // Get the desired facing mode (opposite of current)
+        const wantFacing = usingFrontCamera ? 'environment' : 'user';
 
         // Get new stream FIRST (before stopping old one)
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { exact: currentFacingMode } },
+            video: { facingMode: wantFacing },
             audio: false
         });
+
+        // Verify we actually got a different camera
+        const newTrack = stream.getVideoTracks()[0];
+        const newFacing = newTrack.getSettings().facingMode;
 
         // Now stop old tracks
         if (video.srcObject) {
@@ -1637,11 +1641,10 @@ window.flipCamera = async () => {
 
         // Swap in new stream
         video.srcObject = stream;
-        video.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+        usingFrontCamera = newFacing === 'user' || (!newFacing && !usingFrontCamera);
+        video.style.transform = usingFrontCamera ? 'scaleX(-1)' : 'none';
         VibeLive.setLocalCamera(video);
     } catch (e) {
-        // Revert facing mode on failure
-        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
         showToast('Could not switch camera');
     }
 };
