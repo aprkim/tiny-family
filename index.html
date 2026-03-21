@@ -1621,39 +1621,27 @@ window.flipCamera = async () => {
         const video = camTile.querySelector('video');
         if (!video) { showToast('No video element'); return; }
 
-        // Get current track's device ID
-        const currentTrack = video.srcObject?.getVideoTracks()[0];
-        const currentDeviceId = currentTrack?.getSettings()?.deviceId;
+        // Toggle facing mode
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
 
-        // Find all cameras and pick the next one
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const cameras = devices.filter(d => d.kind === 'videoinput');
-
-        if (cameras.length < 2) {
-            showToast('Only one camera available');
-            return;
-        }
-
-        const currentIdx = cameras.findIndex(c => c.deviceId === currentDeviceId);
-        const nextCamera = cameras[(currentIdx + 1) % cameras.length];
-
-        // Stop old tracks
-        if (currentTrack) currentTrack.stop();
-
-        // Get new stream using device ID
+        // Get new stream FIRST (before stopping old one)
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: nextCamera.deviceId } },
+            video: { facingMode: { exact: currentFacingMode } },
             audio: false
         });
 
+        // Now stop old tracks
+        if (video.srcObject) {
+            video.srcObject.getVideoTracks().forEach(t => t.stop());
+        }
+
+        // Swap in new stream
         video.srcObject = stream;
-        // Mirror front camera only
-        const isFront = nextCamera.label.toLowerCase().includes('front') ||
-                        nextCamera.facingMode === 'user' ||
-                        cameras.indexOf(nextCamera) === 0;
-        video.style.transform = isFront ? 'scaleX(-1)' : 'none';
+        video.style.transform = currentFacingMode === 'user' ? 'scaleX(-1)' : 'none';
         VibeLive.setLocalCamera(video);
     } catch (e) {
+        // Revert facing mode on failure
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
         showToast('Could not switch camera');
     }
 };
