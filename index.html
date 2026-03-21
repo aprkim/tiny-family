@@ -1598,11 +1598,19 @@ window.backToEntry = async () => {
 };
 
 // ===== Go Live =====
+let goingLive = false;
 window.goLive = async () => {
+    if (goingLive) return;
+    goingLive = true;
+    const btn = document.querySelector('.prelive-go');
+    if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
     try {
         await VibeLive.startLive();
     } catch (e) {
         showError('Failed to go live: ' + e.message);
+    } finally {
+        goingLive = false;
+        if (btn) { btn.textContent = 'Go Live'; btn.disabled = false; }
     }
 };
 
