@@ -1,8 +1,8 @@
 # VibeLive Get Started Guide
 
-**VibeLive API Guide v0.75 + Design Guide v2.4**
+**VibeLive API Guide v0.79 + Design Guide v2.4 + Error Guide v1.0**
 
-Last updated: 2026-03-05
+Last updated: 2026-04-06
 
 ---
 
@@ -37,25 +37,26 @@ Scannable list of every functional requirement across both guides. Use this to v
 - [ ] Camera and mic toggle buttons
 - [ ] "Go Live" primary CTA + "Back" secondary button
 - [ ] No remote participants visible
-- [ ] Element-First Rule: both camera and screenshare tiles created and registered here
+- [ ] Element-First Rule: both camera and screenshare tiles created and registered via `registerTile()` in `channelSelected`
 
 ### Live Screen
 - [ ] Same topbar as pre-live
 - [ ] Camera tiles in `#cameraGrid` with 16:9 aspect ratio, responsive layout (1→2→2×2→3+2)
 - [ ] Separate `#screenshareGrid` above `#cameraGrid`
-- [ ] Camera toggle (`toggleVideo()`), mic toggle (`toggleMuteAudio()`), screenshare toggle
+- [ ] Camera toggle (`setVideo(on)`), mic toggle (`setAudioMuted(muted)`), screenshare toggle (`setScreenshare(on)`)
 - [ ] Leave button with danger styling, visually separated
-- [ ] Remote tiles created on demand in `remoteStreamStart`
-- [ ] Remote tiles removed only when `displayStatus === 'EXITED'`
+- [ ] Remote tiles created via `registerTile()` in `remoteStreamStart`
+- [ ] Tile cleanup handled automatically by SDK for registered tiles (member exit, screenshare end, room exit, kick)
 
 ### Media & Tiles
-- [ ] Local camera tile: video/placeholder visibility toggled in `localMediaChange`
-- [ ] Local screenshare tile: `display` toggled AND video/placeholder visibility toggled in `localMediaChange`
-- [ ] Remote camera tile: video/placeholder toggled in `remoteStreamStart` / `remoteStreamEnd` / `remoteMediaChange`
-- [ ] Remote screenshare tile: created in `remoteStreamStart`, removed entirely in `remoteStreamEnd`
-- [ ] Media indicators (camera + mic) on camera tiles using inline SVG icons
-- [ ] LIVE status badge on active tiles (including screenshare tiles)
+- [ ] All tile visibility and indicators driven by unified `memberStateChange` event
+- [ ] `memberStateChange` state shape: `{ status, live, video, audio, screenVideo }` -- same for local AND remote
+- [ ] Camera tile: placeholder shown when `state.video !== 'ON'`
+- [ ] Screenshare tile: `display` toggled based on `state.screenVideo !== 'OFF'`
+- [ ] Media indicators (camera + mic) on camera tiles using inline SVG icons (read `state.video`, `state.audio`)
+- [ ] LIVE status badge on active tiles (read `state.live`)
 - [ ] Initials placeholder when camera is off
+- [ ] Green room member list populated from `getMembers()` on `channelSelected`, kept current via `memberStateChange`
 
 ### Sharing
 - [ ] Copy-code button: copies raw room code
@@ -71,1115 +72,679 @@ Scannable list of every functional requirement across both guides. Use this to v
 ### Session End
 - [ ] Handle `kicked` event for server-initiated exits (e.g. trial time limit)
 - [ ] Styled modal for session-ended message (never native `alert()`)
+- [ ] Call `exitRoom()` in kicked handler to clean up, then return to entry screen
 - [ ] Shared teardown function for both user exit and kicked handler
-- [ ] Do NOT call `exitRoom()` inside `kicked` handler
+
+### Error Handling
+- [ ] Register global `VibeLive.on('error', ...)` handler
+- [ ] Dev bugs (`INIT_*`, `STATE_*`): log to console, never show to user
+- [ ] `SCREENSHARE_CANCELLED`: silently ignore (user chose to cancel)
+- [ ] `ROOM_KICKED`: show styled modal, redirect to entry screen, do not auto-rejoin
+- [ ] `MEDIA_PERMISSION_DENIED`: show permission guide with browser-specific instructions
+- [ ] `MEDIA_DEVICE_BUSY`: show retry button ("camera in use by another app")
+- [ ] `NETWORK_WS_DISCONNECTED`: show subtle "reconnecting..." indicator, auto-hide on restore
+- [ ] `NETWORK_OFFLINE`: show offline banner, auto-retry on `online` event
+- [ ] Retriable errors (`error.retriable === true`): show toast with retry option
+- [ ] Non-retriable errors: show persistent message with `error.hint` if available
+- [ ] Never show raw error codes to users — always use friendly messages
 
 ### Production
-- [ ] Trial contexts: `contextId` only, no token needed
-- [ ] Production contexts: server-side proxy adds `X-Context-Auth-Token` header
+- [ ] Trial projects: `projectId` only, no token needed
+- [ ] Production projects: server-side proxy adds `X-Project-Auth-Token` header
 - [ ] Pass proxy URL via `proxy` option in `VibeLive.init()`
 
 ---
 
----
-
-# VibeLive API Guide
+# VibeLive SDK -- API Reference & Example
 
 **Build an anonymous video chat app with VibeLive**
 
-Version 0.75 | March 04, 2026
+Version 0.79 | April 02, 2026
 
-Works with vanilla JS, React, Vue, or any framework. See [Using VibeLive with React](#using-vibelive-with-react) for React-specific patterns.
+## Implementation Directives
 
----
+1. **Use ONLY the methods, properties, and events documented below.** Do not infer or invent any API not listed in the Methods, State Getters, or Events tables. If you need functionality not covered, leave a `// TODO` comment.
+2. **Wire ALL Required events** from the Event Checklist. Do not skip any.
+3. **Follow the example's code structure.** Do not combine separate handlers into unified abstractions (e.g., merging camera and screenshare logic into one function).
+4. **Read actual state from SDK getters.** Never hardcode indicator values -- always use `getMemberState(id)` or read `mediaState` / `screenState`.
+5. **Include all `<video>` attributes** shown in the example: `autoplay`, `playsinline`, `muted`.
+6. **`createTile` must return a valid element** for both new and existing tiles.
 
 ## Setup
 
-There are two ways to load VibeLive depending on your workflow.
-
-### Option A — ESM Bundle (frameworks / module imports)
-
-Import the self-contained ESM bundle — works with React, Vue, Svelte, TypeScript, or any `import`-based workflow. No source files needed:
-
+**Option A -- ESM** (recommended for `type="module"` scripts):
 ```html
 <script type="module">
-    import VibeLive from 'https://makedo.com/sdk/makedo-vibelive.esm.js';
-
-    VibeLive.init({ contextId: 'YOUR_CONTEXT_ID' });
-
-    // Wire up events...
-    VibeLive.on('channelSelected', (channel) => { /* ... */ });
-    VibeLive.on('remoteStreamStart', (memberId, streamType) => { /* ... */ });
+import VibeLive from 'https://makedo.com/sdk/makedo-vibelive.esm.js';
+VibeLive.init({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
 </script>
 ```
 
-Or if bundling your own app with webpack/vite/esbuild, install the file locally and import it:
-
-```javascript
-import VibeLive from './sdk/makedo-vibelive.esm.js';
-```
-
-### Option B — Pre-built Bundle (plain HTML / no build tools)
-
-Load `makedo-vibelive.min.js` with a plain `<script>` tag. No `import`, no module setup:
-
+**Option B -- IIFE** (plain `<script>` tag, no import):
 ```html
-<!-- Load the bundle — puts VibeLive on window immediately -->
 <script src="https://makedo.com/sdk/makedo-vibelive.min.js"></script>
-
 <script>
-    VibeLive.init({ contextId: 'YOUR_CONTEXT_ID' });
-
-    VibeLive.on('channelSelected', (channel) => { /* ... */ });
-    VibeLive.on('remoteStreamStart', (memberId, streamType) => { /* ... */ });
+VibeLive.init({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
 </script>
-
-<!-- onclick handlers work the same way -->
-<button onclick="VibeLive.signup('Alex')">Join</button>
-<button onclick="VibeLive.startLive()">Go Live</button>
 ```
 
-The bundle is a single self-contained file — no import maps, no `type="module"`, no build tools required. This is the simplest integration for plain HTML pages or CMS environments.
+> Do NOT `import` from `.min.js` -- the IIFE bundle has no `export default`.
 
-> **⚠️ Don't mix them**: Do not `import VibeLive from 'makedo-vibelive.min.js'` — the IIFE bundle has no `export default`. For module imports use Option A (`makedo-vibelive.esm.js`); for plain `<script>` tags use Option B (`makedo-vibelive.min.js`).
+`VibeLive` is attached to `window` automatically -- usable in `onclick` handlers without extra wiring.
 
-> **🧪 Quick Start**: Use `contextId: 'vlp_Hsnz3HDI7gAA'` to test immediately — no token needed.
+### Singleton vs. Multiple Instances
 
-> **Trial vs. Production**
-> Your context ID is all you need to get started. Trial contexts work out of the box — the server applies automatic session limits (room size, duration, concurrency).
-> When you're ready to go to production, you'll receive a non-trial context. Production contexts require a `proxy` option: a server-side endpoint you control that adds your secret auth token to outbound requests, keeping it out of client-side code. Pass it as `proxy: '/my-proxy'`. See [Going to Production](#going-to-production) for details.
+**Most apps need only the singleton.** `VibeLive.init()` creates a single shared instance attached to `window.VibeLive`. All examples in this guide use the singleton.
 
-`VibeLive` is automatically available on `window` in both options — all methods work directly in `onclick` handlers without any extra wiring. The `onclick` style is fine for demos and quick prototypes, but for real apps use `addEventListener` — it supports `async/await`, proper error handling, and keeps logic out of HTML attributes.
+For the rare case where one page must host **multiple independent meetings** (e.g., a monitoring dashboard, side-by-side rooms), use `createInstance()`:
 
----
+```js
+const room1 = VibeLive.createInstance({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
+const room2 = VibeLive.createInstance({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
 
-## User Flow
+await room1.signup('Alice');
+await room1.enterByRoomCode('ABC123');
 
-Anonymous users have two paths — **create** or **join** a room:
-
-```
-signup(name) → createRoom(title) → enterByRoomCode(code) → startLive()
-signup(name) → enterByRoomCode(code) → startLive()
+await room2.signup('Alice');
+await room2.enterByRoomCode('DEF456');
 ```
 
-### Create a Room
+Each instance has its own WebRTC connection, WebSocket, member tracking, and media state. The API surface is identical to the singleton -- every method, getter, and event listed below works the same way. Instances do not share state.
 
-```javascript
-await VibeLive.signup('Alex');
-const room = await VibeLive.createRoom("Alex's Room");
-// room.room_code is the shareable code (e.g., "X7kQ3m")
-await VibeLive.enterByRoomCode(room.room_code);
-// Now in PRE-LIVE — call startLive() when ready
-```
+**Use the singleton (`VibeLive.init()`) unless you have a concrete need for multiple simultaneous rooms.**
 
-### Join a Room
-
-```javascript
-await VibeLive.signup('Jordan');
-await VibeLive.enterByRoomCode('X7kQ3m');
-// Now in PRE-LIVE — call startLive() when ready
-```
-
-### Change Display Name on Rejoin
-
-Pass an optional `displayName` to update your name when entering a channel:
-
-```javascript
-// Exit current room
-await VibeLive.exitRoom();
-
-// Re-enter with new display name (no page reload needed)
-await VibeLive.enterByRoomCode('X7kQ3m', 'NewName');
-// Other members will receive a member_config_update event with your new name
-```
-
-### Always `await` Authentication
-
-`signup()` must complete before any other calls. It establishes the session and WebSocket connection.
-
----
-
-## Member Lifecycle: PRE-LIVE → LIVE → EXIT
+## Lifecycle
 
 ```
-PRE-LIVE    →    LIVE    →    PRE-LIVE or EXIT
-(preparing)      (streaming)   (back or gone)
+[Not joined] -> signup/login -> enterByRoomCode(code) -> [PRE-LIVE] -> startLive() -> [LIVE] -> stopLive() -> [PRE-LIVE]
 ```
 
-| State | What's happening | How to enter |
-|-------|-----------------|--------------|
-| **PRE-LIVE** | Channel selected, no WebRTC | `enterByRoomCode()` |
-| **LIVE** | WebRTC connected, sending/receiving media | `startLive()` |
-| **PRE-LIVE** | WebRTC disconnected, still in channel | `stopLive()` |
-| **EXIT** | Fully departed, camera released | `exitRoom()` |
+- **PRE-LIVE**: In room, camera/mic available for preview, no WebRTC connection.
+- **LIVE**: WebRTC connected, streaming to/from other members.
 
-- `startLive()` — Connect WebRTC, go LIVE
-- `stopLive()` — Disconnect WebRTC, return to PRE-LIVE (quick rejoin possible)
-- `exitRoom()` — Full teardown, release camera/mic, stay logged in (can enter a different room)
-- `logout()` — Full session teardown including authentication
+## Rules (must follow)
 
----
+1. **Use `registerTile()` for all tiles**: After creating a tile DOM element, call `VibeLive.registerTile(memberId, streamType, element)`. This auto-finds the `<video>` inside and registers it (replaces `setLocalCamera`/`setRemoteCamera` etc.). Registered tiles are **auto-removed from the DOM** when a member exits, a screenshare ends, you leave the room, or you get kicked. Do NOT manually remove registered tiles -- the SDK handles lifecycle cleanup.
 
-## Media Controls
+2. **Visibility is yours**: The SDK attaches streams to `<video>` elements (`srcObject`) but never shows or hides anything. Use `memberStateChange` to toggle visibility and update indicators for all members.
 
-### Toggle vs Mute
+3. **Video off != stream end**: A remote member can turn off video while keeping audio active. The stream stays alive (`remoteStreamEnd` does NOT fire), but the video track disappears. `memberStateChange` handles this automatically -- the `video` field changes to `'OFF'` or `'MUTED'`.
 
-Two different concepts — understand the difference:
+4. **Use detail fields for state**: Read `.videoDetail` / `.audioDetail` (returns `'ON'` | `'MUTED'` | `'OFF'`), NOT `.video` / `.audio` (booleans that stay `true` when muted).
 
-| Action | What Happens | Camera Light | Others See |
-|--------|--------------|--------------|------------|
-| `toggleVideo()` | Start/stop capture | On/Off | Video appears/disappears |
-| `toggleMuteVideo()` | Hide while capturing | Stays On | Black frame |
-| `toggleAudio()` | Start/stop microphone | — | Audio appears/disappears |
-| `toggleMuteAudio()` | Silence while capturing | — | Silence |
+5. **`await` everything async**: All methods that touch network (`signup`, `login`, `startLive`, `setVideo`, `enterByRoomCode`, etc.) return promises.
 
-`toggleScreenshare()` starts/stops screen sharing.
+6. **Use `getMembers()` for display names and member lists**: `VibeLive.user` is the raw auth object (has `.username`). For `displayName`, call `await VibeLive.getMembers()` after entering a room. This returns all members with `displayStatus` (`'LIVE'`, `'PRE-LIVE'`, `'EXITED'`), including lobby members -- useful for green room / waiting room UIs. Keep the list current by updating on each `memberStateChange` event using `state.status`.
 
-### Recommended UX Pattern
+7. **One tile per stream type**: Each member can have a camera tile AND a screenshare tile. ID pattern: `tile-{memberId}-camera`, `tile-{memberId}-screenshare`.
 
-**Camera button:** Use `toggleVideo()`
-- Users expect the camera light to turn OFF (privacy)
-- Stopping capture releases system resources
+8. **Stream exists != all tracks are ON**: When `remoteStreamStart` fires, do NOT assume video/audio are both active. Always read actual state from `VibeLive.getMediaStates(id)`. A member can start a stream with video on and audio off (or vice versa).
 
-**Microphone button:** Use `toggleMuteAudio()` (after initial `toggleAudio()` to start capture)
-- Users expect instant unmute (common in meetings)
-- Keeps microphone warm — no permission prompt when unmuting
+## Event Checklist
 
-**Example:**
-```javascript
-// On room entry: connect WebRTC first
-await VibeLive.startLive();          // WebRTC only — does NOT start audio or video
+Every event below exists for a specific reason. **Omitting any REQUIRED event causes incorrect state, stale UI, or missing cleanup.**
 
-// Then start capture (startLive does not do this automatically)
-await VibeLive.toggleAudio();        // Starts mic — required before toggleMuteAudio() is meaningful
-await VibeLive.toggleVideo();        // Starts camera
+### Required -- omitting these causes bugs
 
-// User clicks mic button (during call)
-VibeLive.toggleMuteAudio();         // Mute/unmute — instant, no hardware restart
+| Event | Why it's required |
+|-------|-------------------|
+| `channelSelected` | Set up local tiles, show controls, enable buttons |
+| `memberStateChange` | **Unified state for any member** -- updates LIVE/VID/AUD indicators and placeholder visibility. Fires on every state change for every member (local and remote). Same shape always. |
+| `remoteStreamStart` | Create remote tile via `registerTile()` -- without this, no remote video appears |
 
-// User clicks camera button (during call)
-VibeLive.toggleVideo();             // Stop/start — hardware light on/off
-```
+### Recommended -- omitting these degrades experience
 
-Use `toggleMuteVideo()` only for specialized cases (e.g., "hide self while fixing appearance" but keep capturing).
+| Event | Why it's recommended |
+|-------|----------------------|
+| `localJoined` | Update button enabled/disabled state on going live |
+| `localLeft` | Update button state on stop-live |
+| `remoteJoined` | Pre-create tile before stream arrives (avoids flash of missing content) |
+| `kicked` | Show message to user, call `exitRoom()` to clean up, return to entry screen |
+| `error` | Display or log `MakedoError` with `.code`, `.hint` for debugging |
+| `warning` | Log non-fatal issues (e.g. brief network interruptions) |
 
-### Screenshare
+### Optional -- SDK handles these automatically when using `registerTile()`
 
-Screen sharing is typically offered in **LIVE mode only**. In both cases, follow the Element-First Rule: create and register the screenshare tile in `channelSelected` (hidden with `display: none`).
+| Event | Notes |
+|-------|-------|
+| `remoteStreamEnd` | Screenshare tiles auto-removed by SDK. Only needed if you want custom animation before removal. |
+| `remoteLeft` | Tiles auto-removed for exited members by SDK. Only needed if you want custom exit behavior. |
+| `localMediaChange` | Covered by `memberStateChange` for indicators. Only needed for extra local-only UI. |
+| `localLiveChange` | Covered by `memberStateChange`. Only needed if you want a separate local-only live handler. |
+| `remoteLiveChange` | Covered by `memberStateChange`. Only needed if you want a separate remote-only live handler. |
+| `remoteMediaChange` | Covered by `memberStateChange`. Only needed if you want a separate remote-only media handler. |
 
-### Reading Local Media State
-
-```javascript
-VibeLive.mediaState
-// → { audio: true/false, video: true/false, audioMuted: true/false, videoMuted: true/false }
-
-VibeLive.screenState
-// → { video: true/false, videoMuted: true/false }
-```
-
-### Reading Remote Media State
-
-```javascript
-const states = VibeLive.getMediaStates(memberId);
-// states.cam_audio_detail: 'ON' | 'MUTED' | 'OFF'
-// states.cam_video_detail: 'ON' | 'HIDDEN' | 'OFF'
-// states.screen_audio_detail: 'ON' | 'MUTED' | 'OFF'
-// states.screen_video_detail: 'ON' | 'HIDDEN' | 'OFF'
-```
-
-### Local vs Live Media State
-
-There are two separate "worlds" of media state:
-
-| Source | What it reflects | Use for |
-|--------|-----------------|--------|
-| `VibeLive.mediaState` | **Hardware state** — is the camera/mic capturing? | Local user's indicators |
-| `VibeLive.getMediaStates(id)` | **WebRTC state** — what's being transmitted? | Remote member indicators |
-
-In **PRE-LIVE**, the local camera can be on (for preview) but nothing is transmitted. This is correct — the local indicator reflects what the user cares about: *"Is my camera on?"*
-
-In **LIVE**, the two states naturally align. No special synchronization logic is needed.
-
-**Always use `VibeLive.mediaState` for the local user's indicators** — never `VibeLive.getMediaStates(VibeLive.memberId)`, which reflects WebRTC state and won't be meaningful in PRE-LIVE.
-
----
-
-## The Element-First Rule
-
-> **For local streams: register video elements before streams arrive, not in response to them.**
-
-When VibeLive creates a media stream, it immediately attaches to whatever `<video>` element you've registered. No element registered = stream silently lost.
-
-| Media Type | When to Register | Why |
-|---|---|---|
-| **Local camera** | At tile creation time | `toggleVideo()` attaches immediately |
-| **Local screenshare** | At tile creation time (hidden) | `toggleScreenshare()` attaches immediately |
-| **Remote camera** | Inside `remoteStreamStart` handler | Stream is arriving *right now* |
-| **Remote screenshare** | Inside `remoteStreamStart` handler | Stream is arriving *right now* |
-
-> **Note:** The "before streams arrive" requirement applies only to **local** streams. For remote streams, `remoteStreamStart` is both the signal and the correct registration moment — there is nothing to pre-create.
-
-```javascript
-// ✅ Register both local elements at tile creation
-VibeLive.setLocalCamera(cameraVideoEl);
-VibeLive.setLocalScreen(screenVideoEl);
-
-// ❌ DON'T create elements in localMediaChange — too late!
-```
-
-**Why this matters for screenshare:** When you call `toggleScreenshare()`, the stream is produced **instantly**. If you wait until `localMediaChange` fires to create the tile and call `setLocalScreen()`, the stream has already been produced with no element to attach to — result: blank screen. The element must exist and be registered **before** the user clicks the screenshare button.
-
----
-
-## Building Video Tiles
-
-Each video stream gets its own **independent tile** identified by `tile-{memberId}-{streamType}`. This gives maximum layout flexibility — screenshare tiles can span multiple grid columns, expand on click, or move to a featured area.
-
-### createVideoTile() Pattern
-
-```javascript
-function createVideoTile(memberId, name, streamType, isLocal) {
-    const tileId = `tile-${memberId}-${streamType}`;
-    if (document.getElementById(tileId)) return; // Guard duplicates
-
-    const tile = document.createElement('div');
-    tile.className = 'video-tile';
-    tile.id = tileId;
-    tile.dataset.memberId = memberId;
-    tile.dataset.streamType = streamType;
-    tile.dataset.isLocal = isLocal ? 'true' : 'false';
-
-    // Video container
-    const videoContainer = document.createElement('div');
-    videoContainer.className = 'video-container';
-
-    const placeholder = document.createElement('div');
-    placeholder.className = 'video-placeholder';
-    if (streamType === 'camera') {
-        placeholder.innerHTML = `<span>${isLocal ? `${name} (You)` : name}</span>`;
-    } else {
-        placeholder.innerHTML = `<span>${isLocal ? 'Your' : name + "'s"} Screen</span>`;
-    }
-
-    const video = document.createElement('video');
-    video.autoplay = true;
-    video.playsInline = true;   // Required for iOS
-    video.muted = (isLocal || streamType === 'screenshare');  // Prevent echo
-
-    videoContainer.appendChild(placeholder);
-    videoContainer.appendChild(video);
-
-    // Info bar
-    const memberInfo = document.createElement('div');
-    memberInfo.className = 'member-info';
-    if (streamType === 'camera') {
-        memberInfo.innerHTML = `
-            <span class="member-name">${isLocal ? `${name} (You)` : name}</span>
-            <div class="member-indicators">
-                <span class="status-badge"></span>
-                <span class="indicator cam-video" title="Camera"><!-- SVG icon --></span>
-                <span class="indicator cam-audio" title="Microphone"><!-- SVG icon --></span>
-            </div>
-        `;
-    } else {
-        memberInfo.innerHTML = `
-            <span class="member-name">${isLocal ? 'Your' : name + "'s"} Screen</span>
-            <div class="member-indicators">
-                <span class="status-badge">LIVE</span>
-            </div>
-        `;
-    }
-
-    tile.appendChild(videoContainer);
-    tile.appendChild(memberInfo);
-    // Camera tiles go to cameraGrid; screenshare tiles go to screenshareGrid
-    const targetGrid = streamType === 'screenshare'
-        ? document.getElementById('screenshareGrid')
-        : document.getElementById('cameraGrid');
-    targetGrid.appendChild(tile);
-
-    // Register local elements immediately (Element-First Rule)
-    if (isLocal) {
-        if (streamType === 'camera') {
-            VibeLive.setLocalCamera(video);
-        } else {
-            VibeLive.setLocalScreen(video);
-        }
-    }
-}
-```
-
-**Key points:**
-- Each tile is independent — camera and screenshare are separate grid items
-- `data-member-id`, `data-stream-type`, and `data-is-local` attributes enable CSS targeting and DOM queries
-- CSS examples: `#screenshareGrid .video-tile { width: 100%; }` · `.video-tile[data-is-local="true"] { border: 2px solid #0af; }`
-- To find all remote tiles: `document.querySelectorAll('.video-tile[data-is-local="false"]')`
-- **Two containers are required:** `#cameraGrid` for camera tiles and `#screenshareGrid` for screenshare tiles. This keeps them independently styled and positioned — screenshare tiles are typically larger, full-width, or in a separate column.
-- `playsInline` is required for iOS
-- `muted = true` on local video prevents audio feedback
-- **Icons:** Use inline SVG icons for camera and microphone indicators — no emoji (see [Design Guide §Media Indicators](#media-indicators))
-- **Screenshare labels:** Local user sees "Your Screen"; remote users see "Name's Screen" (see [Design Guide §Screen Share Tile Semantics](#screen-share-tile-semantics))
-- **Screenshare LIVE badge:** Screenshare tiles include a LIVE badge matching the styling of camera tiles (see [Design Guide §Screen Share Tile Semantics](#screen-share-tile-semantics))
-
----
-
-## Moving Video Tiles (Preview Areas, Featured Views)
-
-When implementing preview modes or featured speaker layouts, **always move the existing DOM element** — never remove and recreate.
-
-### ✅ The Safe Way: appendChild()
-
-```javascript
-// Move to preview area (PRE-LIVE)
-const tile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-document.getElementById('previewArea').appendChild(tile);
-
-// Move back to camera grid (LIVE)
-document.getElementById('cameraGrid').appendChild(tile);
-```
-
-**Why this works:** `appendChild()` **moves** the element. The `<video>` element's `srcObject` persists. Element registration remains valid. No re-registration needed.
-
-### ❌ Mistakes That Break Streams
-
-```javascript
-// ❌ Remove then recreate — stream lost
-oldTile.remove();
-createVideoTile(...);
-
-// ❌ Clone the element — new element has no stream
-const clone = original.cloneNode(true);
-
-// ❌ Replace innerHTML — destroys the original element
-container.innerHTML = tile.outerHTML;
-```
-
----
-
-## Event Handlers
-
-### Registering Events
-
-Use `VibeLive.on(event, callback)`:
-
-```javascript
-// Connection state (local)
-VibeLive.on('localJoined', () => { });       // You went LIVE
-VibeLive.on('localLeft', () => { });         // You returned to PRE-LIVE
-VibeLive.on('kicked', (message) => { });     // Server ended the meeting — do NOT call exitRoom()
-
-// Remote members
-VibeLive.on('remoteJoined', (memberId) => { });
-VibeLive.on('remoteLeft', (memberId) => { });
-VibeLive.on('memberUpdate', (memberId) => { });   // Status changed (includes self!)
-
-// Streams
-VibeLive.on('remoteStreamStart', (memberId, streamType) => { });  // 'camera' or 'screenshare'
-VibeLive.on('remoteStreamEnd', (memberId, streamType) => { });
-VibeLive.on('remoteMediaChange', (memberId, streamType) => { });  // Mute/unmute
-
-// Local media
-VibeLive.on('localMediaChange', () => { });
-
-// Channel
-VibeLive.on('channelSelected', (channel) => { });
-
-// Errors
-VibeLive.on('error', (context, error) => { });
-```
-
-Events can be chained:
-```javascript
-VibeLive.on('localJoined', handleJoined)
-        .on('localLeft', handleLeft)
-        .on('error', handleError);
-```
-
-### System-Initiated Exits (`kicked`)
-
-The server can end a meeting for all participants (e.g. a trial time limit). When this happens, `kicked` fires with an optional message. By this point the bridge has already stopped all tracks and cleaned up state — **do not call `exitRoom()`**.
-
-The recommended pattern is a shared teardown function called from both your exit button and your `kicked` handler:
-
-```javascript
-function tearDownRoom(statusMessage = '') {
-    document.getElementById('cameraGrid').innerHTML = '';
-    roomScreen.style.display  = 'none';
-    entryScreen.style.display = 'block';
-    setStatus(statusMessage);
-}
-
-exitBtn.addEventListener('click', async () => {
-    await VibeLive.exitRoom();
-    tearDownRoom();
-});
-
-VibeLive.on('kicked', (message) => {
-    // exitRoom() already called internally — just update the UI
-    tearDownRoom(message || 'The meeting has ended.');
-});
-```
-
-### Handling Remote Streams
-
-When a remote member starts streaming, create their tile and attach the stream:
-
-```javascript
-VibeLive.on('remoteStreamStart', (memberId, streamType) => {
-    if (!VibeLive.isLive) return;  // Privacy-aware: only show when you're live
-
-    const m = VibeLive.getMember(memberId);
-    const tileId = `tile-${memberId}-${streamType}`;
-
-    // Create tile on demand if needed (streams can arrive before join events!)
-    let tile = document.getElementById(tileId);
-    if (!tile) {
-        createVideoTile(memberId, m?.displayName || 'Unknown', streamType, false);
-        tile = document.getElementById(tileId);
-    }
-    if (!tile) return;
-
-    const placeholder = tile.querySelector('.video-placeholder');
-    const video = tile.querySelector('video');
-
-    if (placeholder) placeholder.classList.add('hidden');
-    if (video) {
-        video.classList.add('visible');
-        if (streamType === 'camera') {
-            VibeLive.setRemoteCamera(memberId, video);
-        } else {
-            VibeLive.setRemoteScreen(memberId, video);
-        }
-    }
-
-    updateMemberIndicators(memberId, streamType);
-});
-
-VibeLive.on('remoteStreamEnd', (memberId, streamType) => {
-    const tileId = `tile-${memberId}-${streamType}`;
-    const tile = document.getElementById(tileId);
-    if (!tile) return;
-
-    if (streamType === 'screenshare') {
-        // Screenshare: remove tile entirely
-        tile.remove();
-    } else {
-        // Camera: show placeholder (audio may still be active)
-        const video = tile.querySelector('video');
-        const placeholder = tile.querySelector('.video-placeholder');
-        if (video) video.classList.remove('visible');
-        if (placeholder) placeholder.classList.remove('hidden');
-    }
-
-    updateMemberIndicators(memberId, streamType);
-});
-```
-
-> **⚠️ Always create tiles on demand in `remoteStreamStart`.**
-> When you call `startLive()`, WebRTC begins immediately. If others are already streaming, `remoteStreamStart` can fire **before** `remoteJoined`. If the tile doesn't exist, create it right there. Since `createVideoTile()` guards against duplicates, this is always safe.
-
-### Video Placeholder vs Stream Presence
-
-A stream can exist with only an audio track (video stopped). Use `remoteMediaChange` to check the actual video state:
-
-```javascript
-VibeLive.on('remoteMediaChange', (memberId, streamType) => {
-    const states = VibeLive.getMediaStates(memberId);
-    const tileId = `tile-${memberId}-${streamType}`;
-    const tile = document.getElementById(tileId);
-    if (!tile) return;
-
-    const video = tile.querySelector('video');
-    const placeholder = tile.querySelector('.video-placeholder');
-
-    // Show placeholder when video is not ON (handles 'OFF' and 'HIDDEN')
-    let showPlaceholder = false;
-    if (streamType === 'camera') {
-        showPlaceholder = states.cam_video_detail !== 'ON';
-    } else {
-        showPlaceholder = states.screen_video_detail !== 'ON';
-    }
-
-    if (showPlaceholder) {
-        video?.classList.remove('visible');
-        placeholder?.classList.remove('hidden');
-    } else {
-        video?.classList.add('visible');
-        placeholder?.classList.add('hidden');
-    }
-
-    updateMemberIndicators(memberId, streamType);
-});
-```
-
-### Handling Local Media Changes
-
-VibeLive attaches streams but **never controls visibility**. Use `localMediaChange` to show/hide your own video:
-
-```javascript
-VibeLive.on('localMediaChange', () => {
-    const s = VibeLive.mediaState;
-    const screen = VibeLive.screenState;
-
-    // Camera tile
-    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-    if (camTile) {
-        const placeholder = camTile.querySelector('.video-placeholder');
-        const video = camTile.querySelector('video');
-        if (s.video) {
-            placeholder?.classList.add('hidden');
-            video?.classList.add('visible');
-        } else {
-            placeholder?.classList.remove('hidden');
-            video?.classList.remove('visible');
-        }
-    }
-
-    // Screenshare tile (hide tile entirely when inactive)
-    const screenTile = document.getElementById(`tile-${VibeLive.memberId}-screenshare`);
-    if (screenTile) {
-        if (screen.video) {
-            screenTile.style.display = 'flex';
-            screenTile.querySelector('.video-placeholder')?.classList.add('hidden');
-            screenTile.querySelector('video')?.classList.add('visible');
-        } else {
-            screenTile.style.display = 'none';
-        }
-    }
-
-    updateMemberIndicators(VibeLive.memberId);
-});
-```
-
-**Important:** Local video is attached **directly** when you call `toggleVideo()`, not via WebRTC events. `remoteStreamStart` only fires for **remote** members.
-
-### Handling Member Left
-
-Check whether they truly exited or just returned to PRE-LIVE:
-
-```javascript
-VibeLive.on('remoteLeft', (memberId) => {
-    const m = VibeLive.getMember(memberId);
-    if (m?.displayStatus === 'EXITED') {
-        // Remove tiles — they've left
-        document.getElementById(`tile-${memberId}-camera`)?.remove();
-        document.getElementById(`tile-${memberId}-screenshare`)?.remove();
-    }
-    // If PRE-LIVE, keep tiles — they may rejoin
-});
-```
-
----
-
-## Privacy-Aware Visibility
-
-Recommended pattern: only show remote member tiles when the local user is LIVE. This gives users a private "green room" in PRE-LIVE for adjusting camera/mic.
-
-```javascript
-VibeLive.on('channelSelected', async (channel) => {
-    // PRE-LIVE: show only your own tiles
-    const members = await VibeLive.getMembers();
-    const self = members.find(m => m.id === VibeLive.memberId);
-    if (self) {
-        createVideoTile(self.id, self.displayName, 'camera', true);
-        createVideoTile(self.id, self.displayName, 'screenshare', true);
-        // screenshare tile starts hidden (Element-First Rule)
-    }
-});
-
-VibeLive.on('localJoined', async () => {
-    // Going LIVE: reveal remote members
-    const members = await VibeLive.getMembers();
-    members.forEach(m => {
-        if (m.id === VibeLive.memberId) return;
-        if (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE') {
-            createVideoTile(m.id, m.displayName, 'camera', false);
-        }
-    });
-});
-
-VibeLive.on('localLeft', () => {
-    // Back to PRE-LIVE: remove remote tiles for privacy
-    document.querySelectorAll('.video-tile').forEach(tile => {
-        if (tile.dataset.memberId !== VibeLive.memberId) {
-            tile.remove();
-        }
-    });
-});
-
-VibeLive.on('remoteJoined', (memberId) => {
-    if (!VibeLive.isLive) return;  // Don't show if we're not live
-    const m = VibeLive.getMember(memberId);
-    createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
-});
-```
-
-> **Design choice: who gets a tile on `localJoined`?**
->
-> The example above creates tiles for both `'LIVE'` and `'PRE-LIVE'` members when you go LIVE. This is the recommended default — you see everyone already in the channel, including those still preparing.
->
-> You can restrict to `'LIVE'` only if your app only wants to show members who are actively streaming:
-> ```javascript
-> // Variation: streamers only
-> if (m.displayStatus === 'LIVE') {
->     createVideoTile(m.id, m.displayName, 'camera', false);
-> }
-> ```
-> The tradeoff:
-> - **`'LIVE' || 'PRE-LIVE'`** — everyone present gets a tile immediately; good for small groups and social apps
-> - **`'LIVE'` only** — tiles appear only when streaming starts; better for larger rooms or broadcast-style apps where PRE-LIVE presence is invisible by design
->
-> Note: `remoteJoined` fires when a member goes LIVE (not when they enter PRE-LIVE), so it always represents a `'LIVE'` member — no filtering needed there.
-
-```javascript
-
-VibeLive.on('remoteStreamStart', (memberId, streamType) => {
-    if (!VibeLive.isLive) return;  // Don't show if we're not live
-    // ... attach stream (see Handling Remote Streams above)
-});
-```
-
----
-
-## Member Info
-
-```javascript
-const member = VibeLive.getMember(memberId);
-member.displayName     // "Alex"
-member.displayStatus   // 'LIVE', 'PRE-LIVE', or 'EXITED'
-member.hasCamera       // boolean
-member.hasScreenshare  // boolean
-
-// Fetch all current channel members from server
-const members = await VibeLive.getMembers();
-// → [{ id, displayName, displayStatus, ... }]
-```
-
-Use `VibeLive.memberId` for your own member ID. Use `VibeLive.roomCode` for the shareable room code.
-
-`memberUpdate` fires for ALL members including yourself. Always re-query `getMember(memberId)` inside the handler — the event is a signal that data changed, not a carrier of the new data:
-
-```javascript
-VibeLive.on('memberUpdate', (memberId) => {
-    const member = VibeLive.getMember(memberId);  // re-query for fresh state
-    if (!member) return;
-    // member.displayStatus, member.displayName, member.hasCamera, etc. are now current
-});
-```
-
----
-
-## Complete Minimal Example
-
-A working app in under 50 lines of JavaScript:
+## Complete Working Example
 
 ```html
 <!DOCTYPE html>
-<html>
-<head>
-    <title>VibeLive Demo</title>
-    <style>
-        .video-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-        .video-tile { position: relative; width: 320px; height: 240px; background: #222; }
-        .video-tile video { width: 100%; height: 100%; object-fit: cover; }
-        .video-placeholder { position: absolute; inset: 0; display: flex;
-            align-items: center; justify-content: center; color: white; font-size: 1.2em; }
-        .hidden { display: none; }
-        .visible { display: block; }
-        /* Screenshare tiles are wider — style independently from camera grid */
-        #screenshareGrid .video-tile { width: 100%; max-width: 800px; height: 450px; }
-    </style>
-</head>
-<body>
-    <h2>VibeLive</h2>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { background: #000; color: #fff; font-family: system-ui; margin: 0; padding: 1rem; }
+  button, input { background: #000; color: #fff; border: 1px solid #666; padding: .4rem .8rem; margin: .2rem; }
+  button:hover { background: #fff; color: #000; cursor: pointer; }
+  button:disabled { opacity: .3; cursor: default; }
+  .grid { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+  .tile { position: relative; width: 320px; height: 240px; background: #111; overflow: hidden; }
+  .tile video { width: 100%; height: 100%; object-fit: cover; display: none; }
+  .tile video.visible { display: block; }
+  .tile .placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+  .tile .placeholder.hidden { display: none !important; }
+  .tile .name { position: absolute; bottom: 4px; left: 4px; font-size: 11px; background: rgba(0,0,0,.6); padding: 2px 6px; }
+  .ind { position: absolute; top: 4px; left: 4px; font-size: 10px; font-weight: bold; margin-right: 4px; }
+  .ind.on { color: #0f0; } .ind.off { color: #f00; }
+</style>
+</head><body>
 
-    <div id="entry">
-        <input id="name" placeholder="Your name">
-        <button id="createBtn">Create Room</button>
-        <input id="code" placeholder="Room code">
-        <button id="joinBtn">Join Room</button>
-    </div>
+<div id="entry">
+  <input id="nameInput" placeholder="Your name">
+  <input id="codeInput" placeholder="Room code">
+  <button onclick="join()">Join</button>
+  <button onclick="createRoom()">Create Room</button>
+</div>
 
-    <div id="controls" style="display: none;">
-        <span id="roomInfo"></span>
-        <button onclick="VibeLive.startLive()">Go Live</button>
-        <button onclick="VibeLive.stopLive()">Stop Live</button>
-        <button onclick="VibeLive.toggleVideo()">Toggle Camera</button>
-        <button onclick="VibeLive.toggleMuteAudio()">Mute/Unmute Mic</button>
-    </div>
+<div id="controls" style="display:none">
+  <span id="roomInfo"></span>
+  <button id="btnLive" onclick="VibeLive.startLive()" disabled>Go Live</button>
+  <button id="btnStop" onclick="VibeLive.stopLive()" disabled>Stop Live</button>
+  <button onclick="VibeLive.setVideo(!VibeLive.mediaState.video)">Video</button>
+  <button onclick="VibeLive.setAudio(!VibeLive.mediaState.audio)">Mic</button>
+  <button onclick="VibeLive.setScreenshare(!VibeLive.screenState.video)">Screen</button>
+  <button onclick="VibeLive.exitRoom()">Exit</button>
+</div>
 
-    <div id="screenshareGrid" class="video-grid"></div>
-    <div id="cameraGrid" class="video-grid"></div>
+<div class="grid" id="grid"></div>
 
-    <script type="module">
-        import VibeLive from 'https://makedo.com/sdk/vibelive-api.js';
+<script type="module">
+import VibeLive from 'https://makedo.com/sdk/makedo-vibelive.esm.js';
+VibeLive.init({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
 
-        VibeLive.init({ contextId: 'vlp_Hsnz3HDI7gAA' });  // trial — contextId only, no token needed
+// ---- Helpers ----
 
-        // --- Entry functions ---
+function createTile(id, name, streamType, isLocal) {
+    const tileId = `tile-${id}-${streamType}`;
+    if (document.getElementById(tileId)) return document.getElementById(tileId);
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.id = tileId;
+    const label = streamType === 'screenshare'
+        ? `${isLocal ? 'Your' : name + "'s"} Screen`
+        : name;
+    tile.innerHTML = `
+        <span class="ind ind-live off">LIVE</span>
+        <span class="ind ind-vid off" style="left:40px">VID</span>
+        <span class="ind ind-aud off" style="left:72px">AUD</span>
+        <div class="placeholder"><span>${label}</span></div>
+        <video autoplay playsinline ${isLocal || streamType === 'screenshare' ? 'muted' : ''}></video>
+        <div class="name">${label}</div>`;
+    document.getElementById('grid').appendChild(tile);
+    if (streamType === 'screenshare') tile.style.display = 'none';
+    // registerTile auto-finds <video> and registers it (replaces setLocalCamera/setRemoteCamera).
+    // SDK auto-removes registered tiles on member exit, screenshare end, room exit, or kick.
+    VibeLive.registerTile(id, streamType, tile);
+    return tile;
+}
 
-        document.getElementById('createBtn').addEventListener('click', async () => {
-            await VibeLive.signup(document.getElementById('name').value || 'Guest');
-            const room = await VibeLive.createRoom('My Room');
-            await VibeLive.enterByRoomCode(room.room_code);
-        });
+function setIndicator(tileId, type, isOn) {
+    const el = document.getElementById(tileId)?.querySelector(`.ind-${type}`);
+    if (el) { el.classList.toggle('on', isOn); el.classList.toggle('off', !isOn); }
+}
 
-        document.getElementById('joinBtn').addEventListener('click', async () => {
-            await VibeLive.signup(document.getElementById('name').value || 'Guest');
-            await VibeLive.enterByRoomCode(document.getElementById('code').value);
-        });
+function updateTileVisibility(tileId, videoOn) {
+    const tile = document.getElementById(tileId);
+    if (!tile) return;
+    tile.querySelector('.placeholder')?.classList.toggle('hidden', videoOn);
+    tile.querySelector('video')?.classList.toggle('visible', videoOn);
+}
 
-        // --- Events ---
+function updateButtons() {
+    const live = VibeLive.isLive;
+    document.getElementById('btnLive').disabled = live;
+    document.getElementById('btnStop').disabled = !live;
+}
 
-        VibeLive.on('channelSelected', async (channel) => {
-            document.getElementById('entry').style.display = 'none';
-            document.getElementById('controls').style.display = 'block';
-            document.getElementById('roomInfo').textContent = `Room: ${VibeLive.roomCode}`;
+// ---- Events ----
 
-            // Create local tile (Element-First Rule)
-            const self = (await VibeLive.getMembers()).find(m => m.id === VibeLive.memberId);
-            if (self) {
-                createVideoTile(self.id, self.displayName, 'camera', true);
-                createVideoTile(self.id, self.displayName, 'screenshare', true);
-            }
-
-            // Start camera + mic for preview
-            await VibeLive.toggleVideo();
-            await VibeLive.toggleAudio();
-        });
-
-        VibeLive.on('localJoined', async () => {
-            const members = await VibeLive.getMembers();
-            members.forEach(m => {
-                if (m.id !== VibeLive.memberId &&
-                    (m.displayStatus === 'LIVE' || m.displayStatus === 'PRE-LIVE')) {
-                    createVideoTile(m.id, m.displayName, 'camera', false);
-                }
-            });
-        });
-
-        VibeLive.on('remoteJoined', (id) => {
-            if (!VibeLive.isLive) return;
-            const m = VibeLive.getMember(id);
-            createVideoTile(id, m?.displayName || 'Unknown', 'camera', false);
-        });
-
-        VibeLive.on('remoteStreamStart', (id, type) => {
-            if (!VibeLive.isLive) return;
-            const m = VibeLive.getMember(id);
-            let tile = document.getElementById(`tile-${id}-${type}`);
-            if (!tile) {
-                createVideoTile(id, m?.displayName || 'Unknown', type, false);
-                tile = document.getElementById(`tile-${id}-${type}`);
-            }
-            const video = tile?.querySelector('video');
-            if (video) {
-                video.classList.add('visible');
-                tile.querySelector('.video-placeholder')?.classList.add('hidden');
-                if (type === 'camera') VibeLive.setRemoteCamera(id, video);
-                else VibeLive.setRemoteScreen(id, video);
-            }
-        });
-
-        VibeLive.on('remoteStreamEnd', (id, type) => {
-            const tile = document.getElementById(`tile-${id}-${type}`);
-            if (!tile) return;
-            if (type === 'screenshare') { tile.remove(); return; }
-            tile.querySelector('video')?.classList.remove('visible');
-            tile.querySelector('.video-placeholder')?.classList.remove('hidden');
-        });
-
-        VibeLive.on('localMediaChange', () => {
-            const s = VibeLive.mediaState;
-            const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-            if (camTile) {
-                const v = camTile.querySelector('video');
-                const p = camTile.querySelector('.video-placeholder');
-                if (s.video) { p?.classList.add('hidden'); v?.classList.add('visible'); }
-                else { p?.classList.remove('hidden'); v?.classList.remove('visible'); }
-            }
-            const screenTile = document.getElementById(`tile-${VibeLive.memberId}-screenshare`);
-            if (screenTile) screenTile.style.display = VibeLive.screenState.video ? 'block' : 'none';
-        });
-
-        VibeLive.on('remoteLeft', (id) => {
-            const m = VibeLive.getMember(id);
-            if (m?.displayStatus === 'EXITED') {
-                document.getElementById(`tile-${id}-camera`)?.remove();
-                document.getElementById(`tile-${id}-screenshare`)?.remove();
-            }
-            // If PRE-LIVE, keep tiles — they stopped streaming but haven't left
-        });
-
-        VibeLive.on('error', (ctx, err) => console.error(`[${ctx}]`, err.message));
-
-        // --- Tile creation ---
-
-        function createVideoTile(memberId, name, streamType, isLocal) {
-            const tileId = `tile-${memberId}-${streamType}`;
-            if (document.getElementById(tileId)) return;
-
-            const tile = document.createElement('div');
-            tile.className = 'video-tile';
-            tile.id = tileId;
-            tile.dataset.memberId = memberId;
-            tile.dataset.streamType = streamType;
-            tile.dataset.isLocal = isLocal ? 'true' : 'false';
-            if (streamType === 'screenshare' && isLocal) tile.style.display = 'none';
-
-            tile.innerHTML = `
-                <div class="video-placeholder"><span>${streamType === 'camera'
-                    ? (isLocal ? `${name} (You)` : name)
-                    : (isLocal ? 'Your' : name + "'s") + ' Screen'}</span></div>
-                <video autoplay playsinline ${isLocal || streamType === 'screenshare' ? 'muted' : ''}></video>
-            `;
-
-            // Camera tiles go to cameraGrid; screenshare tiles go to screenshareGrid
-            const targetGrid = streamType === 'screenshare'
-                ? document.getElementById('screenshareGrid')
-                : document.getElementById('cameraGrid');
-            targetGrid.appendChild(tile);
-
-            if (isLocal) {
-                const video = tile.querySelector('video');
-                if (streamType === 'camera') VibeLive.setLocalCamera(video);
-                else VibeLive.setLocalScreen(video);
-            }
-        }
-    </script>
-</body>
-</html>
-```
-
----
-
-## Going to Production
-
-Trial contexts are designed for building and testing. They work with a `contextId` alone and impose automatic limits:
-
-| Limit | Default |
-|-------|---------|
-| Active rooms at once | 3 |
-| Participants per room | 3 |
-| Session duration | 10 minutes |
-| Post-session cooldown | 1 minute |
-
-When you're ready to move beyond trial, you'll receive a **production context**. Production contexts have more lenient automatic limits but require an auth token to be attached to API requests. Because you should never expose a secret token in client-side code, VibeLive uses a **proxy pattern**:
-
-1. You create a small server-side endpoint (any language/framework)
-2. That endpoint forwards requests to the VibeLive server, adding your secret auth token as a header
-3. You pass your endpoint's URL as `proxy` to `VibeLive.init()`
-
-```js
-// Trial (no token needed)
-VibeLive.init({ contextId: 'YOUR_CONTEXT_ID' });
-
-// Production (proxy adds the secret token server-side)
-VibeLive.init({ contextId: 'YOUR_CONTEXT_ID', proxy: '/my-makedo-proxy' });
-```
-
-A minimal Express proxy looks like:
-
-```js
-app.post('/my-makedo-proxy', async (req, res) => {
-    const response = await fetch('https://makedo.com/...', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Context-Auth-Token': process.env.MAKEDO_AUTH_TOKEN  // secret stays server-side
-        },
-        body: JSON.stringify(req.body)
-    });
-    res.json(await response.json());
+VibeLive.on('channelSelected', async (channel) => {
+    document.getElementById('entry').style.display = 'none';
+    document.getElementById('controls').style.display = 'block';
+    const members = await VibeLive.getMembers();
+    const self = members.find(m => m.id === VibeLive.memberId);
+    createTile(VibeLive.memberId, self?.displayName || 'You', 'camera', true);
+    createTile(VibeLive.memberId, self?.displayName || 'You', 'screenshare', true);
+    updateButtons();
 });
+
+VibeLive.on('localJoined', () => {
+    updateButtons();
+});
+
+VibeLive.on('localLeft', () => {
+    updateButtons();
+});
+
+// ---- Unified state handler -- indicators + visibility for ALL members ----
+
+VibeLive.on('memberStateChange', (id, state) => {
+    // state = { status: 'LIVE'|'PRE-LIVE'|'EXITED', live: boolean, video, audio, screenVideo }
+    const camTile = `tile-${id}-camera`;
+
+    // Camera indicators
+    setIndicator(camTile, 'live', state.live);
+    setIndicator(camTile, 'vid', state.video === 'ON');
+    setIndicator(camTile, 'aud', state.audio === 'ON');
+
+    // Camera placeholder <-> video visibility
+    updateTileVisibility(camTile, state.video === 'ON');
+
+    // Screenshare tile show/hide
+    const screenTile = document.getElementById(`tile-${id}-screenshare`);
+    if (screenTile) {
+        screenTile.style.display = state.screenVideo !== 'OFF' ? 'block' : 'none';
+        screenTile.querySelector('.placeholder')?.classList.toggle('hidden', state.screenVideo !== 'OFF');
+        screenTile.querySelector('video')?.classList.toggle('visible', state.screenVideo !== 'OFF');
+    }
+});
+
+VibeLive.on('remoteJoined', (id) => {
+    const m = VibeLive.getMember(id);
+    createTile(id, m?.displayName || 'Remote', 'camera', false);
+});
+
+VibeLive.on('remoteStreamStart', (id, type) => {
+    const m = VibeLive.getMember(id);
+    createTile(id, m?.displayName || 'Remote', type, false);
+    // registerTile (inside createTile) handles video element registration.
+    // memberStateChange handles indicators. Nothing else needed.
+});
+
+// remoteStreamEnd: screenshare tiles auto-removed by SDK (registered tile).
+// remoteLeft: tiles auto-removed by SDK when member exits (registered tiles).
+
+VibeLive.on('kicked', (message) => {
+    alert(message || 'You have been removed from this room.');
+    VibeLive.exitRoom();  // SDK auto-removes all registered tiles
+    document.getElementById('controls').style.display = 'none';
+    document.getElementById('entry').style.display = 'block';
+});
+
+VibeLive.on('error', (context, error) => {
+    console.error(`[${context}]`, error.code || '', error.message);
+});
+
+VibeLive.on('warning', (context, message) => {
+    console.warn(`[${context}]`, message);
+});
+
+// ---- Entry Actions ----
+
+window.join = async function() {
+    const name = document.getElementById('nameInput').value.trim() || 'Guest';
+    const code = document.getElementById('codeInput').value.trim();
+    if (!code) return alert('Enter a room code');
+    await VibeLive.signup(name);
+    await VibeLive.enterByRoomCode(code);
+};
+
+window.createRoom = async function() {
+    const name = document.getElementById('nameInput').value.trim() || 'Guest';
+    await VibeLive.signup(name);
+    const room = await VibeLive.createRoom('My Room');
+    document.getElementById('roomInfo').textContent = `Room code: ${room.room_code}`;
+    await VibeLive.enterByRoomCode(room.room_code);
+};
+</script>
+</body></html>
 ```
 
----
-
-## API Quick Reference
+## API Reference
 
 ### Methods
 
-| Method | Description |
-|--------|-------------|
-| `init({ contextId, proxy?, serverUrl? })` | Initialize VibeLive. Trial: `contextId` only. Production: add `proxy` URL. |
-| `signup(name)` | Create anonymous guest session |
-| `login(email, password)` | Login with existing account |
-| `logout()` | Logout and cleanup |
-| `createRoom(title)` | Create room, returns `{ id, room_code, title }` |
-| `enterByRoomCode(code, displayName?)` | Enter room → PRE-LIVE (displayName optional, updates member name) |
-| `startLive()` | Connect WebRTC → LIVE |
-| `stopLive()` | Disconnect WebRTC → PRE-LIVE |
-| `exitRoom()` | Full teardown, release camera/mic — stay logged in |
-| `toggleAudio()` | Start/stop mic hardware |
-| `toggleVideo()` | Start/stop camera hardware |
-| `toggleScreenshare()` | Start/stop screen share |
-| `toggleMuteAudio()` | Mute/unmute mic (keeps capturing) |
-| `toggleMuteVideo()` | Hide/show video (keeps capturing) |
-| `toggleMuteScreenshare()` | Hide/show screenshare (keeps capturing) |
-| `getMember(memberId)` | Get member info |
-| `getMemberIds()` | Get all member IDs |
-| `getMembers()` | Fetch all channel members from server |
-| `getMediaStates(memberId)` | Get `cam_audio_detail`, `cam_video_detail`, etc. |
-| `getStream(memberId, streamType)` | Get raw MediaStream |
-| `setLocalCamera(videoEl)` | Register local camera element |
-| `setLocalScreen(videoEl)` | Register local screenshare element |
-| `setRemoteCamera(id, videoEl)` | Register remote camera element |
-| `setRemoteScreen(id, videoEl)` | Register remote screenshare element |
-| `clearLocalCamera()` | Unregister local camera element |
-| `clearLocalScreen()` | Unregister local screenshare element |
-| `clearRemoteCamera(id)` | Unregister remote camera element |
-| `clearRemoteScreen(id)` | Unregister remote screenshare element |
-| `on(event, callback)` | Register event handler (chainable) |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `init(config)` | `VibeLive` | Initialize. `config`: `{ projectId, proxy?, projectKey?, serverUrl? }` |
+| `signup(name)` | `Promise` | Anonymous signup. Must `await`. |
+| `login(email, password, projectId?)` | `Promise` | Login with credentials. |
+| `logout()` | `Promise` | Logout and cleanup. |
+| `createRoom(title, options?)` | `Promise<{ id, room_code, title }>` | Create a room. |
+| `enterByRoomCode(code, displayName?)` | `Promise` | Enter room -> PRE-LIVE. |
+| `exitRoom()` | `void` | Leave room. Releases media. |
+| `selectChannel(channelId, displayName?)` | `Promise` | Enter by channel ID -> PRE-LIVE. |
+| `loadChannels()` | `Promise` | Load channel list (login flow). |
+| `loadUsers()` | `Promise` | Load user list (login flow). |
+| `selectUser(userId)` | `Promise` | Quick-chat with user -> PRE-LIVE. |
+| `getChannelInfo(roomCode)` | `Promise<Object>` | Look up channel info without joining. |
+| `backToList()` | `void` | Return to channel list (cleanup). |
+| `startLive()` | `Promise` | Connect WebRTC -> LIVE. |
+| `stopLive(keepMedia?)` | `void` | Disconnect WebRTC -> PRE-LIVE. `keepMedia` default `true`. |
+| `setVideo(on)` | `Promise` | Set camera on/off. Idempotent. |
+| `setAudio(on)` | `Promise` | Set microphone on/off. Idempotent. |
+| `setScreenshare(on)` | `Promise` | Set screenshare on/off. Idempotent. |
+| `setVideoMuted(muted)` | `Promise` | Hide/show video (track stays alive). Idempotent. |
+| `setAudioMuted(muted)` | `Promise` | Mute/unmute audio (track stays alive). Idempotent. |
+| `setScreenshareMuted(muted)` | `Promise` | Hide/show screenshare (track stays alive). Idempotent. |
+| `registerTile(memberId, streamType, element)` | `void` | **Recommended.** Register a tile DOM element. Auto-finds `<video>` inside and registers it. SDK auto-removes on member exit, screenshare end, room exit, or kick. |
+| `unregisterTile(memberId, streamType)` | `void` | Manually unregister + remove a tile. Rarely needed -- SDK handles cleanup automatically. |
+| `setLocalCamera(videoEl)` | `void` | Register local camera `<video>`. Not needed when using `registerTile()`. |
+| `setLocalScreen(videoEl)` | `void` | Register local screenshare `<video>`. Not needed when using `registerTile()`. |
+| `setRemoteCamera(memberId, videoEl)` | `void` | Register remote camera `<video>`. Not needed when using `registerTile()`. |
+| `setRemoteScreen(memberId, videoEl)` | `void` | Register remote screenshare `<video>`. Not needed when using `registerTile()`. |
+| `clearLocalCamera()` | `void` | Unregister local camera element. Not needed when using `registerTile()`. |
+| `clearLocalScreen()` | `void` | Unregister local screenshare element. Not needed when using `registerTile()`. |
+| `clearRemoteCamera(memberId)` | `void` | Unregister remote camera element. Not needed when using `registerTile()`. |
+| `clearRemoteScreen(memberId)` | `void` | Unregister remote screenshare element. Not needed when using `registerTile()`. |
+| `getMember(memberId)` | `Object \| null` | `{ displayName, displayStatus, hasCamera, hasScreenshare }` |
+| `getMemberIds()` | `string[]` | All member IDs in current channel. |
+| `getMembers()` | `Promise<Array>` | Fetch all members: `[{ id, displayName, baseStatus, displayStatus }]` |
+| `getMediaStates(memberId)` | `Object` | See State Getters below. |
+| `getMemberState(memberId)` | `Object` | **Unified state triple** -- works for local AND remote. See State Getters below. |
+| `getStream(memberId, streamType)` | `MediaStream \| null` | Raw stream. `streamType`: `'camera'` or `'screenshare'`. |
+| `on(event, callback)` | `VibeLive` | Register event handler. Chainable. |
+| `createInstance(config)` | `Object` | Create an independent VibeLive instance for multi-room. Same API as the singleton. See "Singleton vs. Multiple Instances" above. |
 
-### Getters
+### State Getters
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `isLoggedIn` | boolean | Authenticated? |
-| `isLive` | boolean | WebRTC connected (LIVE)? |
-| `user` | Object | Current user |
-| `memberId` | string | Your member ID |
-| `roomCode` | string | Shareable room code |
-| `channel` | Object | Current channel: `{ id, room_code, title, description, memberCount }` |
-| `mediaState` | Object | `{ audio, video, audioMuted, videoMuted }` |
-| `screenState` | Object | `{ video, videoMuted }` |
-| `hasMedia` | boolean | Any local media active? |
+| Getter | Returns | Notes |
+|--------|---------|-------|
+| `VibeLive.isLoggedIn` | `boolean` | Authenticated? |
+| `VibeLive.isLive` | `boolean` | WebRTC connected? |
+| `VibeLive.user` | `Object \| null` | Raw auth user (`username`, NOT `displayName`). |
+| `VibeLive.memberId` | `string \| null` | Your member ID in current room. |
+| `VibeLive.roomCode` | `string \| null` | Current room's shareable code. |
+| `VibeLive.channel` | `Object \| null` | Current channel object. |
+| `VibeLive.channels` | `Array` | Loaded channels (login flow). |
+| `VibeLive.hasMedia` | `boolean` | Any local media active? |
+| `VibeLive.mediaState` | see below | Local camera/mic state. |
+| `VibeLive.screenState` | see below | Local screenshare state. |
+
+**`VibeLive.mediaState`** -- local camera/mic:
+```json
+{ "audio": true, "video": true, "audioMuted": false, "videoMuted": false,
+  "audioDetail": "ON", "videoDetail": "ON" }
+```
+
+**`VibeLive.screenState`** -- local screenshare:
+```json
+{ "audio": false, "video": true, "videoMuted": false, "videoDetail": "ON" }
+```
+
+**`VibeLive.getMemberState(memberId)`** -- unified state for any member (local or remote, same shape):
+```json
+{ "status": "LIVE", "live": true, "video": "ON", "audio": "MUTED", "screenVideo": "OFF" }
+```
+`status` is `'LIVE'`, `'PRE-LIVE'`, or `'EXITED'`. `live` is a convenience boolean (`status === 'LIVE'`).
+
+**`VibeLive.getMediaStates(memberId)`** -- remote member (same `detail` field names):
+```json
+{ "audioDetail": "ON", "videoDetail": "MUTED", "screenAudioDetail": "OFF", "screenVideoDetail": "ON" }
+```
+
+**Detail values**: `'ON'` (active), `'MUTED'` (track alive but muted/hidden), `'OFF'` (no track).
+
+**IMPORTANT**: Use `.videoDetail` / `.audioDetail` for UI state, not `.video` / `.audio`. The booleans mean "track exists" and stay `true` when muted.
 
 ### Events
 
-| Event | Callback signature | Description |
-|-------|-------------------|-------------|
-| `login` | `(user)` | Logged in |
-| `loginError` | `(error)` | Login failed |
-| `logout` | `()` | Logged out |
-| `channelSelected` | `(channel)` | Entered a room (PRE-LIVE). `channel`: `{ id, room_code, title, description, memberCount }` |
-| `localJoined` | `()` | You went LIVE |
-| `localLeft` | `()` | You returned to PRE-LIVE |
-| `kicked` | `(message)` | Server ended the meeting — do NOT call `exitRoom()` |
-| `remoteJoined` | `(memberId)` | Remote member went LIVE |
-| `remoteLeft` | `(memberId)` | Remote member stopped LIVE |
-| `memberUpdate` | `(memberId)` | Member status changed (includes self) |
-| `remoteStreamStart` | `(memberId, streamType)` | Remote stream arrived |
-| `remoteStreamEnd` | `(memberId, streamType)` | Remote stream ended |
-| `remoteMediaChange` | `(memberId, streamType)` | Remote mute/unmute |
-| `localMediaChange` | `()` | Local media state changed |
-| `error` | `(context, error)` | Error occurred |
+Register with `VibeLive.on(event, callback)`.
 
----
+| Event | Callback signature | When it fires |
+|-------|-------------------|---------------|
+| `login` | `(user)` | Signup or login succeeded. |
+| `loginError` | `(error)` | Signup or login failed. |
+| `logout` | `()` | Logged out. |
+| `channelsLoaded` | `(channels)` | `loadChannels()` completed. |
+| `usersLoaded` | `(users)` | `loadUsers()` completed. |
+| `channelSelected` | `(channel)` | Entered a room (PRE-LIVE). Create your local tiles here. |
+| `localJoined` | `()` | You went LIVE (`startLive()` completed). |
+| `localLeft` | `()` | You returned to PRE-LIVE (`stopLive()` or disconnected). |
+| `memberStateChange` | `(memberId, state)` | **Any member's state changed.** `state`: `{ status, live, video, audio, screenVideo }` where `status` is `'LIVE'\|'PRE-LIVE'\|'EXITED'`, `live` is a boolean, and video/audio/screenVideo are `'ON'\|'MUTED'\|'OFF'`. Fires for local AND remote. Use this for all indicators + visibility. |
+| `localLiveChange` | `(isLive: boolean)` | Your live status changed. Use for LIVE indicator. |
+| `localMediaChange` | `()` | Your camera/mic/screen state changed. Read `VibeLive.mediaState` / `VibeLive.screenState`. |
+| `remoteJoined` | `(memberId)` | Remote member connected to WebRTC (fires once per session). |
+| `remoteLeft` | `(memberId)` | Remote member stopped streaming. Check `getMember(id).displayStatus` -- may be `'EXITED'` or `'PRE-LIVE'`. |
+| `remoteStreamStart` | `(memberId, streamType)` | Remote stream arrived. `streamType`: `'camera'` or `'screenshare'`. Create tile + call `registerTile()` here. |
+| `remoteStreamEnd` | `(memberId, streamType)` | Remote stream ended. Screenshare tiles auto-removed if registered. Only needed for custom cleanup UI. |
+| `remoteLiveChange` | `(memberId, isLive)` | Remote member's live status changed (camera stream started/ended). |
+| `remoteMediaChange` | `(memberId, streamType)` | Remote member's video/audio state changed (mute, unmute, video off/on). **Also needed for placeholder toggling** -- not just indicators. |
+| `memberUpdate` | `(memberId)` | Member info/status updated in database. |
+| `kicked` | `(message)` | You were removed from the room by the server. |
+| `error` | `(context, error)` | Async error. `error` is `MakedoError` with `.code`, `.hint`, `.retriable`. |
+| `warning` | `(context, message)` | Non-fatal warning (e.g. element registered after stream started). |
 
-## Common Mistakes
+### Error Codes
 
-1. **Not calling `init()` first** — Every method throws `"Call VibeLive.init() first"` without it.
+Access via `VibeLive.ErrorCodes`. Errors are `MakedoError` instances with `.code`, `.message`, `.hint`, `.retriable`, `.context`.
 
-2. **Not awaiting `signup()`** — Session and WebSocket won't be ready for subsequent calls.
+| Code | Category | Retriable |
+|------|----------|-----------|
+| `INIT_REQUIRED` | Init | No |
+| `INIT_INVALID_CONFIG` | Init | No |
+| `AUTH_FAILED` | Auth | No |
+| `AUTH_SESSION_EXPIRED` | Auth | Yes |
+| `AUTH_TOKEN_REFRESH_FAILED` | Auth | Yes |
+| `AUTH_PROXY_FAILED` | Auth | No |
+| `AUTH_FORBIDDEN` | Auth | No |
+| `MEDIA_PERMISSION_DENIED` | Media | No |
+| `MEDIA_DEVICE_BUSY` | Media | Yes |
+| `MEDIA_NOT_FOUND` | Media | No |
+| `MEDIA_OVERCONSTRAINED` | Media | Yes |
+| `MEDIA_TRACK_REPLACE_FAILED` | Media | Yes |
+| `MEDIA_TRACK_ENDED` | Media | Yes |
+| `MEDIA_UNKNOWN` | Media | No |
+| `SCREENSHARE_PERMISSION_DENIED` | Screenshare | No |
+| `SCREENSHARE_UNSUPPORTED` | Screenshare | No |
+| `SCREENSHARE_CANCELLED` | Screenshare | No |
+| `SCREENSHARE_UNKNOWN` | Screenshare | No |
+| `ROOM_NOT_FOUND` | Room | No |
+| `ROOM_JOIN_FAILED` | Room | Yes |
+| `ROOM_KICKED` | Room | No |
+| `ROOM_SFU_UNREACHABLE` | Room | Yes |
+| `NETWORK_HTTP_ERROR` | Network | Yes |
+| `NETWORK_TIMEOUT` | Network | Yes |
+| `NETWORK_OFFLINE` | Network | Yes |
+| `NETWORK_WS_AUTH_FAILED` | Network | No |
+| `NETWORK_WS_DISCONNECTED` | Network | Yes |
+| `STATE_NOT_LOGGED_IN` | State | No |
+| `STATE_NOT_IN_ROOM` | State | No |
+| `STATE_ALREADY_LIVE` | State | No |
+| `STATE_NO_ELEMENT` | State | No |
 
-3. **Forgetting `startLive()`** — `enterByRoomCode()` only puts you in PRE-LIVE. You must call `startLive()` to connect WebRTC and start sending/receiving media.
+## Pitfalls
 
-   PRE-LIVE is intentional, not just a waiting room. In PRE-LIVE, the local camera and mic work normally — you can call `toggleVideo()` and `toggleAudio()` and the user will see their own preview. Nothing is transmitted to others yet. This is the "green room": users adjust their setup privately before going live.
+1. **`VibeLive.user` has no `displayName`** -- it's the raw auth object. Use `getMembers()` for display names.
+2. **`.audio` stays `true` when muted** -- use `.audioDetail === 'ON'` instead of `.audio`.
+3. **Creating `<video>` elements in `localMediaChange`** -- too late. The stream is already produced. Create tiles in `channelSelected`.
+4. **`remoteStreamStart` signature is `(memberId, streamType)`** -- two arguments, no stream object. Create tile + call `registerTile()` -- the SDK attaches streams automatically.
+5. **`.hidden` CSS specificity** -- if your `.hidden` class uses `display: none` and a component class sets `display: flex`, the component wins. Use `!important` on `.hidden` or higher specificity.
+6. **`setVideo(on)` vs `setVideoMuted(muted)`** -- `setVideo(false)` turns hardware off (`.videoDetail`: `'OFF'`). `setVideoMuted(true)` keeps capturing but hides (`.videoDetail`: `'MUTED'`). Same pattern for audio: `setAudio(false)` vs `setAudioMuted(true)`.
+7. **Screenshare tiles must start hidden** -- set `display: none` initially. `memberStateChange` shows them when `screenVideo !== 'OFF'`.
+8. **Do NOT manually remove registered tiles** -- calling `.remove()` on a tile you passed to `registerTile()` bypasses SDK cleanup. Use `unregisterTile()` if you need manual removal, or let the SDK handle it automatically.
 
-   Common mistakes stemming from misunderstanding PRE-LIVE:
-   - Calling `startLive()` immediately inside `channelSelected` — this skips the green room and connects WebRTC before the user is ready.
-   - Expecting remote tiles to appear in PRE-LIVE — remote streams don't arrive until you call `startLive()`.
-   - Being surprised that `toggleVideo()` works in PRE-LIVE but nobody else can see you — correct behaviour, by design.
+## React Integration
 
-4. **Creating video elements too late (Element-First Rule)** — Register elements *before* streams arrive. If you create a `<video>` element in `localMediaChange`, the stream is already lost.
+React requires different patterns from the vanilla example above. The API is identical -- only the wiring differs.
 
-   **⚠️ CRITICAL for screenshare:** The screenshare `<video>` element must exist and be registered with `setLocalScreen()` BEFORE calling `toggleScreenshare()`. Create both camera and screenshare tiles in `channelSelected`, with the screenshare tile hidden (`display: none`).
+### Key Differences from Vanilla
 
-5. **Not creating tiles on demand in `remoteStreamStart`** — Stream events can arrive before `remoteJoined`. Always check if the tile exists and create it if needed.
+- **Init once** in a top-level module or context provider, not inside a component.
+- **`useRef`** for `<video>` elements -- React controls the DOM, so no `document.getElementById`.
+- **`useEffect` with cleanup** for event wiring -- return a teardown function that calls `exitRoom()`.
+- **Do NOT use `registerTile()`** -- it calls `element.remove()` on cleanup, which fights React's reconciler. Use `setLocalCamera`/`setRemoteCamera` directly with refs instead.
+- **Read state via SDK getters** in event callbacks, then push into React state with `setState`.
 
-6. **Missing `playsInline` on video elements** — Required for iOS. Videos won't autoplay inline without it.
-
-7. **Not muting your own `<video>` element** — Always set `muted = true` on local video elements to prevent audio feedback/echo.
-
-8. **Not checking status in `remoteLeft`** — A member with `displayStatus === 'PRE-LIVE'` hasn't left; they may rejoin. Only remove tiles for `'EXITED'` members.
-
-9. **Using `getMediaStates()` for local indicators** — Use `VibeLive.mediaState` for the local user. `getMediaStates(VibeLive.memberId)` reflects WebRTC state and is meaningless in PRE-LIVE.
-
-10. **Confusing toggle vs mute** — Camera: use `toggleVideo()` (hardware on/off). Microphone: use `toggleMuteAudio()` after initial startup (instant mute/unmute).
-
-11. **Removing and recreating tiles to move them** — Use `appendChild()` to move the existing element. Never `.remove()` then recreate — the stream attachment is lost.
-
-12. **Ignoring self status changes in `memberUpdate`** — While you shouldn't create tiles for yourself, you MUST update your UI controls (Start/Stop Live buttons, status text) when `memberId === VibeLive.memberId`. Check `member.displayStatus` and update buttons BEFORE returning:
-   ```javascript
-   VibeLive.on('memberUpdate', (memberId) => {
-       const member = VibeLive.getMember(memberId);
-       if (memberId === VibeLive.memberId) {
-           // Update YOUR controls based on status
-           if (member.displayStatus === 'LIVE') {
-               startBtn.disabled = true;
-               stopBtn.disabled = false;
-           } else if (member.displayStatus === 'PRE-LIVE') {
-               startBtn.disabled = false;
-               stopBtn.disabled = true;
-           }
-           return;  // NOW skip tile operations
-       }
-       // Handle remote member tiles...
-   });
-   ```
-
----
-
-## Using VibeLive with React
-
-VibeLive works well with React. A few patterns to know:
-
-### Stabilize ref callbacks with `useCallback`
-
-VibeLive needs real DOM elements via `setLocalCamera()`, `setRemoteCamera()`, etc. In React, an inline ref callback creates a new function on every render, which causes React to tear down and re-fire the ref — re-registering the same element repeatedly. This can cause **video flicker**.
-
-Wrap ref callbacks in `useCallback`:
-
-```jsx
-const videoRefCallback = useCallback((el) => {
-    if (!el) return;
-    if (tile.isLocal) VibeLive.setLocalCamera(el);
-}, [tile.id, tile.isLocal, tile.streamType]);
-
-<video ref={videoRefCallback} autoPlay playsInline muted />
-```
-
-### The Element-First Rule in React
-
-The [Element-First Rule](#the-element-first-rule) requires local video elements to exist *before* streams are produced. In React, elements only exist after render — so if your component conditionally renders a tile based on state, the element won't be in the DOM when `toggleVideo()` runs.
-
-Always include local tiles in the render output and hide with `style` instead of unmounting:
+### Complete React Example
 
 ```jsx
-// ✅ Always in DOM — ref fires on mount, element ready before toggleVideo()
-const hideTile = tile.isLocal && !tile.showVideo;
-<div style={hideTile ? { display: 'none' } : {}}>
-    <video ref={videoRefCallback} ... />
-</div>
+import { useState, useEffect, useRef, useCallback } from 'react';
+import VibeLive from 'https://makedo.com/sdk/makedo-vibelive.esm.js';
 
-// ❌ Element doesn't exist until showVideo is true — too late
-{tile.showVideo && <div><video ref={videoRefCallback} ... /></div>}
-```
+VibeLive.init({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
 
-### Register remote elements after render
+function VideoTile({ memberId, streamType, name, isLocal }) {
+    const videoRef = useRef(null);
 
-When `remoteStreamStart` fires, you'll update state to add a tile — but React hasn't rendered yet, so the `<video>` element doesn't exist. Register remote elements in a `useEffect` that runs after the render completes:
-
-```jsx
-useEffect(() => {
-    tiles.forEach(tile => {
-        if (tile.isLocal || !tile.showVideo) return;
-        const el = videoRefs.current[tile.id];
+    useEffect(() => {
+        const el = videoRef.current;
         if (!el) return;
-        VibeLive.setRemoteCamera(tile.memberId, el);
-    });
-}, [tiles]);
+        if (isLocal) {
+            if (streamType === 'camera') VibeLive.setLocalCamera(el);
+            else VibeLive.setLocalScreen(el);
+        } else {
+            if (streamType === 'camera') VibeLive.setRemoteCamera(memberId, el);
+            else VibeLive.setRemoteScreen(memberId, el);
+        }
+        return () => {
+            if (isLocal) {
+                if (streamType === 'camera') VibeLive.clearLocalCamera();
+                else VibeLive.clearLocalScreen();
+            } else {
+                if (streamType === 'camera') VibeLive.clearRemoteCamera(memberId);
+                else VibeLive.clearRemoteScreen(memberId);
+            }
+        };
+    }, [memberId, streamType, isLocal]);
+
+    return (
+        <div style={{ position: 'relative', width: 320, height: 240, background: '#111' }}>
+            <video ref={videoRef} autoPlay playsInline muted={isLocal || streamType === 'screenshare'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <span style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 11, background: '#000a', padding: '2px 6px', color: '#fff' }}>
+                {streamType === 'screenshare' ? `${name} (Screen)` : name}
+            </span>
+        </div>
+    );
+}
+
+export default function MeetingRoom() {
+    const [inRoom, setInRoom] = useState(false);
+    const [isLive, setIsLive] = useState(false);
+    const [tiles, setTiles] = useState([]);       // [{ id, name, type, isLocal }]
+    const [members, setMembers] = useState([]);    // [{ id, name, status }]
+    const nameRef = useRef('');
+    const codeRef = useRef('');
+
+    // Helper: update one member in the members list
+    const updateMember = useCallback((id, status) => {
+        const m = VibeLive.getMember(id);
+        const name = m?.displayName || 'Unknown';
+        setMembers(prev => {
+            if (status === 'EXITED') return prev.filter(x => x.id !== id);
+            const idx = prev.findIndex(x => x.id === id);
+            const entry = { id, name, status };
+            if (idx >= 0) { const next = [...prev]; next[idx] = entry; return next; }
+            return [...prev, entry];
+        });
+    }, []);
+
+    // Helper: add a tile if not already present
+    const addTile = useCallback((id, name, type, isLocal) => {
+        setTiles(prev => {
+            if (prev.some(t => t.id === id && t.type === type)) return prev;
+            return [...prev, { id, name, type, isLocal }];
+        });
+    }, []);
+
+    // Helper: remove tiles for a member
+    const removeTiles = useCallback((id) => {
+        setTiles(prev => prev.filter(t => t.id !== id));
+    }, []);
+
+    useEffect(() => {
+        VibeLive.on('channelSelected', async () => {
+            setInRoom(true);
+            const list = await VibeLive.getMembers();
+            const self = list.find(m => m.id === VibeLive.memberId);
+            addTile(VibeLive.memberId, self?.displayName || 'You', 'camera', true);
+            setMembers(list.map(m => ({ id: m.id, name: m.displayName, status: m.displayStatus })));
+        });
+        VibeLive.on('localJoined', () => setIsLive(true));
+        VibeLive.on('localLeft', () => setIsLive(false));
+        VibeLive.on('memberStateChange', (id, state) => updateMember(id, state.status));
+        VibeLive.on('remoteStreamStart', (id, type) => {
+            const m = VibeLive.getMember(id);
+            addTile(id, m?.displayName || 'Remote', type, false);
+        });
+        VibeLive.on('remoteLeft', (id) => removeTiles(id));
+        VibeLive.on('error', (ctx, err) => console.error(`[${ctx}]`, err.message));
+        return () => { VibeLive.exitRoom(); };
+    }, [addTile, removeTiles, updateMember]);
+
+    const join = async () => {
+        await VibeLive.signup(nameRef.current || 'Guest');
+        await VibeLive.enterByRoomCode(codeRef.current);
+    };
+
+    if (!inRoom) {
+        return (
+            <div>
+                <input placeholder="Name" onChange={e => nameRef.current = e.target.value} />
+                <input placeholder="Room code" onChange={e => codeRef.current = e.target.value} />
+                <button onClick={join}>Join</button>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                {members.filter(m => m.status !== 'EXITED').map(m => (
+                    <span key={m.id} style={{ padding: '4px 8px', border: '1px solid',
+                        borderColor: m.status === 'LIVE' ? '#0f0' : '#ff0',
+                        color: m.status === 'LIVE' ? '#0f0' : '#ff0', fontSize: 11 }}>
+                        {m.name}
+                    </span>
+                ))}
+            </div>
+            <div>
+                <button onClick={() => VibeLive.startLive()} disabled={isLive}>Go Live</button>
+                <button onClick={() => VibeLive.stopLive()} disabled={!isLive}>Stop</button>
+                <button onClick={() => VibeLive.setVideo(!VibeLive.mediaState.video)}>Cam</button>
+                <button onClick={() => VibeLive.setAudio(!VibeLive.mediaState.audio)}>Mic</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                {tiles.map(t => (
+                    <VideoTile key={`${t.id}-${t.type}`} memberId={t.id}
+                        streamType={t.type} name={t.name} isLocal={t.isLocal} />
+                ))}
+            </div>
+        </div>
+    );
+}
 ```
 
-> **Note:** The API includes same-element guards, so calling `setRemoteCamera()` with an already-registered element is harmless. You don't need to track registration state yourself.
+### React Pitfalls
 
----
+1. **Do NOT use `registerTile()`** in React -- the SDK's DOM removal conflicts with React's virtual DOM. Use `setLocalCamera`/`setRemoteCamera` with refs and manage tile visibility via React state.
+2. **Do NOT call `VibeLive.init()` inside a component** -- it runs on every render. Call it once at module scope or in a context provider.
+3. **Always return a cleanup function** from `useEffect` that calls `exitRoom()` -- otherwise hot-reload or unmount leaks the WebRTC connection.
+4. **Use `useRef` for input values** in join forms -- `useState` causes re-renders on every keystroke which can interfere with SDK callbacks firing mid-render.
 
-*VibeLive API v1.0*
+### Multi-Room in React
 
----
+Use `createInstance()` per component. Each instance is independent:
+
+```jsx
+function MeetingPanel({ roomCode }) {
+    const vl = useRef(null);
+    if (!vl.current) vl.current = VibeLive.createInstance({ projectId: 'YOUR_TRIAL_PROJECT_ID' });
+
+    useEffect(() => {
+        const inst = vl.current;
+        inst.on('channelSelected', () => { /* ... */ });
+        inst.on('memberStateChange', (id, state) => { /* ... */ });
+        inst.signup('Observer').then(() => inst.enterByRoomCode(roomCode));
+        return () => { inst.exitRoom(); };
+    }, [roomCode]);
+
+    // ... render using vl.current instead of VibeLive
+}
+
+// Usage: three independent meeting panels
+<MeetingPanel roomCode="ABC123" />
+<MeetingPanel roomCode="DEF456" />
+<MeetingPanel roomCode="GHI789" />
+```
 
 ---
 
@@ -1791,4 +1356,210 @@ Accessibility:
 
 ---
 
-*VibeLive Get Started Guide — API v0.75 + Design v2.4 | Last updated: 2026-03-05*
+# Error Handling Guide
+
+**Error Guide v1.0**
+
+Last updated: 2026-04-06
+
+**Handle every SDK error gracefully — never show raw codes to users.**
+
+## How Errors Work
+
+The SDK fires a single `error` event for all async errors:
+
+```js
+VibeLive.on('error', (context, error) => {
+    // context  — string: which SDK method failed (e.g. 'setVideo', 'joinChannel')
+    // error    — MakedoError instance
+    console.log(error.code);      // e.g. 'MEDIA_PERMISSION_DENIED'
+    console.log(error.message);   // human-readable description
+    console.log(error.hint);      // suggested fix (or null)
+    console.log(error.retriable); // true, false, or null
+    console.log(error.cause);     // original browser/network error (or null)
+});
+```
+
+You can also check error codes programmatically:
+
+```js
+const { ErrorCodes } = VibeLive;
+
+VibeLive.on('error', (context, error) => {
+    if (error.code === ErrorCodes.MEDIA_PERMISSION_DENIED) {
+        showPermissionDialog();
+    }
+});
+```
+
+## Error Code Reference
+
+### Initialization (dev bugs — never show to users)
+
+| Code | When It Fires | Retriable |
+|------|--------------|-----------|
+| `INIT_REQUIRED` | SDK method called before `VibeLive.init()` | No |
+| `INIT_INVALID_CONFIG` | `init()` called with bad/missing config | No |
+
+### Authentication
+
+| Code | When It Fires | User Message | Retriable |
+|------|--------------|-------------|-----------|
+| `AUTH_FAILED` | Credentials rejected | "Login failed. Please check your credentials." | No |
+| `AUTH_SESSION_EXPIRED` | Session timed out (401) | "Your session has expired. Please sign in again." | Yes |
+| `AUTH_TOKEN_REFRESH_FAILED` | Background token refresh failed | "Connection issue. Please sign in again." | Yes |
+| `AUTH_PROXY_FAILED` | Auth proxy endpoint error | Show generic "connection error" | No |
+| `AUTH_FORBIDDEN` | Wrong projectId/key (403) | Show generic "unable to connect" | No |
+
+### Media (Camera/Mic)
+
+| Code | When It Fires | User Message | Retriable |
+|------|--------------|-------------|-----------|
+| `MEDIA_PERMISSION_DENIED` | User denied camera/mic | "Camera/mic access was blocked. Check your browser permissions." | No |
+| `MEDIA_DEVICE_BUSY` | Camera locked by another app | "Your camera is being used by another app. Close it and try again." | Yes |
+| `MEDIA_NOT_FOUND` | No camera or mic detected | "No camera or microphone found. Please connect a device." | No |
+| `MEDIA_OVERCONSTRAINED` | Resolution not supported | "Your camera doesn't support the requested quality. Adjusting..." | Yes |
+| `MEDIA_TRACK_REPLACE_FAILED` | Device hot-swap failed | "Couldn't switch devices. Try again." | Yes |
+| `MEDIA_TRACK_ENDED` | Device unplugged or OS revoked | "Your camera/mic was disconnected." | Yes |
+| `MEDIA_UNKNOWN` | Unrecognized media error | "Something went wrong with your camera. Try again." | — |
+
+### Screenshare
+
+| Code | When It Fires | User Message | Retriable |
+|------|--------------|-------------|-----------|
+| `SCREENSHARE_PERMISSION_DENIED` | OS denied screen share | "Screen sharing was blocked by your system settings." | No |
+| `SCREENSHARE_UNSUPPORTED` | Browser lacks support | "Screen sharing isn't supported in this browser." | No |
+| `SCREENSHARE_CANCELLED` | User clicked Cancel | **Do nothing.** Not an error. Revert button state. | — |
+| `SCREENSHARE_UNKNOWN` | Unrecognized error | "Screen sharing failed. Try again." | — |
+
+### Room / Channel
+
+| Code | When It Fires | User Message | Retriable |
+|------|--------------|-------------|-----------|
+| `ROOM_NOT_FOUND` | Room doesn't exist or was deleted | "This room doesn't exist or has been removed." | No |
+| `ROOM_JOIN_FAILED` | Couldn't join (capacity, server issue) | "Couldn't join the room. Please try again." | Yes |
+| `ROOM_KICKED` | Host removed user from room | "You were removed from this room." | No |
+| `ROOM_SFU_UNREACHABLE` | Video server not reachable | "Can't reach the video server. Check your connection." | Yes |
+
+### Network
+
+| Code | When It Fires | User Message | Retriable |
+|------|--------------|-------------|-----------|
+| `NETWORK_HTTP_ERROR` | API returned non-200 | "Something went wrong. Please try again." | Yes |
+| `NETWORK_TIMEOUT` | API call timed out | "The request timed out. Check your connection." | Yes |
+| `NETWORK_OFFLINE` | No network connection | "You're offline. Check your internet connection." | Yes |
+| `NETWORK_WS_AUTH_FAILED` | WebSocket auth rejected | "Real-time connection failed. Please sign in again." | No |
+| `NETWORK_WS_DISCONNECTED` | WebSocket dropped | "Connection lost. Reconnecting..." | Yes |
+
+### State Guards (dev bugs — never show to users)
+
+| Code | When It Fires | Retriable |
+|------|--------------|-----------|
+| `STATE_NOT_LOGGED_IN` | Method called before login | No |
+| `STATE_NOT_IN_ROOM` | Media method called outside room | No |
+| `STATE_ALREADY_LIVE` | `joinChannel()` called while already live | No |
+| `STATE_NO_ELEMENT` | `setVideo(true)` but no tile registered | No |
+
+## Error Object Shape
+
+```
+MakedoError {
+  .code       — string: one of the codes above
+  .message    — string: human-readable description
+  .hint       — string|null: suggested resolution
+  .retriable  — boolean|null: whether retry could work
+  .context    — string|null: which SDK method failed
+  .cause      — Error|null: original browser/network error
+  .timestamp  — number: Date.now() when created
+  .toString() — formatted diagnostic string
+  .toJSON()   — plain object for logging
+}
+```
+
+## Required Error Handler
+
+Every VibeLive app must include this handler. Customize the `showToast` and `showAlert` functions for your UI:
+
+```js
+VibeLive.on('error', (context, error) => {
+    const { code, message, hint, retriable } = error;
+
+    // Dev bugs — log and fix, never show to users
+    if (code.startsWith('INIT_') || code.startsWith('STATE_')) {
+        console.error(`[DEV BUG] [${context}] ${code}: ${message}`);
+        return;
+    }
+
+    // User cancelled screenshare — not an error
+    if (code === 'SCREENSHARE_CANCELLED') return;
+
+    // Kicked — special UX flow
+    if (code === 'ROOM_KICKED') {
+        showModal('You were removed from the room.');
+        exitToEntry();
+        return;
+    }
+
+    // Permission errors — longer display, user needs time to read
+    if (code === 'MEDIA_PERMISSION_DENIED' || code === 'SCREENSHARE_PERMISSION_DENIED') {
+        console.warn(`[VibeLive] [${context}] ${code}: ${message}`, hint);
+        showToast(message, { duration: 8000 });
+        return;
+    }
+
+    // Retriable — toast with Retry button
+    if (retriable) {
+        console.warn(`[VibeLive] [${context}] ${code}: ${message}`, hint);
+        showToast(message, { action: 'Retry' });
+        return;
+    }
+
+    // Non-retriable — auto-dismiss toast (inform and get out of the way)
+    console.warn(`[VibeLive] [${context}] ${code}: ${message}`, hint);
+    showToast(message, { duration: 5000 });
+});
+```
+
+## What to Show vs. What to Log
+
+**CRITICAL: Never display `error.code`, `error.context`, `error.hint`, `error.retriable`, or `error.cause` to users.** These fields are for developer debugging only.
+
+| Field | Show to User? | Log to Console? |
+|-------|:---:|:---:|
+| Friendly message (from User Message column) | Yes | Yes |
+| `error.code` | No | Yes |
+| `error.context` | No | Yes |
+| `error.hint` | No | Yes |
+| `error.retriable` | No | Yes |
+| `error.cause` | No | Yes |
+
+**Correct:**
+```js
+// User sees: "You were removed from this room."
+// Console gets: full debug info
+console.warn(`[VibeLive] [${context}] ${code}: ${message}`, hint);
+showModal('You were removed from this room.');
+```
+
+**Wrong:**
+```js
+// Never show this to a user:
+showModal(`[${code}] ${message}\ncontext: ${context}\nhint: ${hint}\nretriable: ${retriable}`);
+```
+
+## UX Rules
+
+1. **Never show error codes, context, hints, or debug fields to users.** Only show the friendly message.
+2. **Log everything to console** — `code`, `context`, `hint`, `cause` are invaluable for debugging.
+3. **Never use native `alert()`.** Use styled toasts or modals.
+4. **Retriable errors get a toast** with a Retry button — the user can act on it.
+5. **Non-retriable errors auto-dismiss (~5s)** — inform and get out of the way. The user can't fix it, so don't block the UI.
+6. **Permission errors display longer (~8-10s)** — the user needs time to read and navigate to browser/OS settings.
+7. **Buttons only when there's a meaningful action.** If there's nothing the user can do, just inform and move on.
+8. **`SCREENSHARE_CANCELLED` is silent** — the user chose to cancel.
+9. **`ROOM_KICKED` redirects** — do not auto-rejoin.
+10. **Network reconnection** — show a subtle indicator, hide when restored.
+
+---
+
+*VibeLive Get Started Guide -- API v0.79 + Design v2.4 + Error Guide v1.0 | Last updated: 2026-04-06*

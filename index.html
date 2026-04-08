@@ -1147,7 +1147,6 @@ let localName = '';
 let isHost = false;
 let customRoomName = null;
 let requiredPin = null;
-let previewStream = null;
 let preCamOn = true;
 let preMicOn = false;
 
@@ -1396,19 +1395,11 @@ window.createRoom = async () => {
     btnCreate.innerHTML = '<span class="spinner"></span>Creating...';
     isHost = true;
 
-    // Capture camera NOW during user gesture (iOS requires this)
-    try {
-        previewStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' }, audio: false
-        });
-    } catch (e) { console.warn('Early camera capture:', e); }
-
     try {
         await VibeLive.signup(name);
         const room = await VibeLive.createRoom(`${name}'s Family Room`);
         await VibeLive.enterByRoomCode(room.room_code);
     } catch (e) {
-        if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
         showError(friendlyError(e));
         btnCreate.disabled = false;
         btnCreate.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a Room';
@@ -1433,18 +1424,10 @@ window.joinRoom = async () => {
     btnJoin.disabled = true;
     isHost = false;
 
-    // Capture camera NOW during user gesture (iOS requires this)
-    try {
-        previewStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' }, audio: false
-        });
-    } catch (e) { console.warn('Early camera capture:', e); }
-
     try {
         await VibeLive.signup(name);
         await VibeLive.enterByRoomCode(code);
     } catch (e) {
-        if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
         showError(friendlyError(e));
         btnJoin.disabled = false;
         btnJoin.textContent = 'Join';
@@ -1452,26 +1435,9 @@ window.joinRoom = async () => {
 };
 
 // ===== Pre-Live Controls =====
-window.togglePreCam = async () => {
+window.togglePreCam = () => {
     preCamOn = !preCamOn;
-    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-    if (!camTile) return;
-    const vid = camTile.querySelector('video');
-    const ph = camTile.querySelector('.video-placeholder');
-
-    if (preCamOn) {
-        try {
-            previewStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user' }, audio: false
-            });
-            if (vid) { vid.srcObject = previewStream; vid.classList.add('visible'); vid.play().catch(() => {}); }
-            if (ph) ph.classList.add('hidden');
-        } catch (e) { console.warn('togglePreCam:', e); preCamOn = false; }
-    } else {
-        if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
-        if (vid) { vid.srcObject = null; vid.classList.remove('visible'); }
-        if (ph) ph.classList.remove('hidden');
-    }
+    VibeLive.setVideo(preCamOn);
     updatePreLiveButtons();
 };
 
@@ -1610,15 +1576,9 @@ makeCodeEditable(document.getElementById('liveCode'));
 
 // ===== Shared Teardown =====
 function teardown() {
-    // Remove all remote tiles
-    document.querySelectorAll('#cameraGrid .video-tile').forEach(tile => {
-        if (tile.dataset.isLocal !== 'true') tile.remove();
-    });
-    // Remove local tile from grid
-    const localCam = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-    if (localCam) localCam.remove();
-    // Remove preview tiles
-    document.getElementById('previewArea').querySelectorAll('.video-tile').forEach(t => t.remove());
+    // SDK auto-removes registered tiles on exitRoom/kick.
+    // Clean up any remaining tiles just in case.
+    document.querySelectorAll('#cameraGrid .video-tile, #previewArea .video-tile').forEach(t => t.remove());
 
     hideResetButton();
     isHost = false;
@@ -1626,7 +1586,6 @@ function teardown() {
     requiredPin = null;
     preCamOn = true;
     preMicOn = false;
-    if (previewStream) { previewStream.getTracks().forEach(t => t.stop()); previewStream = null; }
 
     showScreen('entryScreen');
     // Restore entry UI if it was hidden for slug join
@@ -1647,9 +1606,9 @@ function teardown() {
 }
 
 // ===== Back to Entry =====
-window.backToEntry = async () => {
+window.backToEntry = () => {
     isLeavingRoom = true;
-    await VibeLive.exitRoom();
+    VibeLive.exitRoom();
     teardown();
     setTimeout(() => { isLeavingRoom = false; }, 200);
 };
@@ -1662,22 +1621,15 @@ window.goLive = async () => {
     const btn = document.querySelector('.prelive-go');
     if (btn) { btn.textContent = 'Connecting...'; btn.disabled = true; }
     try {
-        // Stop preview stream before going live
-        if (previewStream) {
-            previewStream.getTracks().forEach(t => t.stop());
-            previewStream = null;
-        }
-
         const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Connection timed out')), 10000)
         );
         await Promise.race([VibeLive.startLive(), timeout]);
 
-        // Start VibeLive media respecting pre-live choices
-        if (preCamOn) await VibeLive.toggleVideo();
-        // Always start audio capture, then mute if user chose mic off
-        await VibeLive.toggleAudio();
-        if (!preMicOn) VibeLive.toggleMuteAudio();
+        // Set media state respecting pre-live choices
+        await VibeLive.setVideo(preCamOn);
+        await VibeLive.setAudio(true);
+        if (!preMicOn) await VibeLive.setAudioMuted(true);
     } catch (e) {
         showError('Failed to go live: ' + e.message);
     } finally {
@@ -1688,11 +1640,13 @@ window.goLive = async () => {
 
 // ===== Live Controls =====
 window.toggleLiveMic = () => {
-    VibeLive.toggleMuteAudio();
+    const s = VibeLive.mediaState;
+    VibeLive.setAudioMuted(!s.audioMuted);
 };
 
 window.toggleLiveCam = () => {
-    VibeLive.toggleVideo();
+    const s = VibeLive.mediaState;
+    VibeLive.setVideo(!s.video);
 };
 
 // ===== Flip Camera (mobile only) =====
@@ -1732,7 +1686,7 @@ window.flipCamera = async () => {
         video.srcObject = stream;
         usingFrontCamera = !usingFrontCamera;
         video.style.transform = usingFrontCamera ? 'scaleX(-1)' : 'none';
-        VibeLive.setLocalCamera(video);
+        VibeLive.setLocalCamera(video); // Re-register after stream swap
 
         // Stop old tracks AFTER VibeLive has the new stream
         if (oldStream) {
@@ -1744,15 +1698,15 @@ window.flipCamera = async () => {
 };
 
 // ===== Leave Room =====
-window.leaveRoom = async () => {
+window.leaveRoom = () => {
     isLeavingRoom = true;
-    await VibeLive.exitRoom();
+    VibeLive.exitRoom();
     teardown();
     setTimeout(() => { isLeavingRoom = false; }, 200);
 };
 
 window.addEventListener('beforeunload', () => {
-    if (VibeLive.isLive) VibeLive.exitRoom();
+    VibeLive.exitRoom();
 });
 
 // ===== Video Tile Creation =====
@@ -1833,6 +1787,7 @@ function createVideoTile(memberId, name, streamType, isLocal) {
         tile.appendChild(tileActions);
     }
 
+    // Per guide: return tile. Caller must append to DOM, then call registerTile().
     return tile;
 }
 
@@ -2104,55 +2059,7 @@ window.resetTileLayout = () => {
     showToast('Layout reset');
 };
 
-// ===== Member Indicators =====
-function updateMemberIndicators(memberId, streamType) {
-    const isLocal = memberId === VibeLive.memberId;
-
-    // Camera tile indicators
-    const camTile = document.getElementById(`tile-${memberId}-camera`);
-    if (camTile) {
-        let camOn, micOn;
-
-        if (isLocal) {
-            const s = VibeLive.mediaState;
-            camOn = s.video;
-            micOn = s.audio && !s.audioMuted;
-        } else {
-            const states = VibeLive.getMediaStates(memberId);
-            camOn = states?.cam_video_detail === 'ON';
-            micOn = states?.cam_audio_detail === 'ON';
-        }
-
-        const camInd = camTile.querySelector('.cam-video');
-        const micInd = camTile.querySelector('.cam-audio');
-        if (camInd) {
-            camInd.classList.toggle('off', !camOn);
-            camInd.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
-        }
-        if (micInd) {
-            micInd.classList.toggle('off', !micOn);
-            micInd.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
-        }
-
-        const badge = camTile.querySelector('.status-badge');
-        if (badge) {
-            badge.className = 'status-badge';
-            if (isLocal) {
-                if (VibeLive.isLive) {
-                    badge.classList.add('live');
-                    badge.textContent = 'LIVE';
-                }
-            } else {
-                const m = VibeLive.getMember(memberId);
-                if (m?.displayStatus === 'LIVE') {
-                    badge.classList.add('live');
-                    badge.textContent = 'LIVE';
-                }
-            }
-        }
-    }
-
-}
+// Member indicators now handled by memberStateChange event
 
 // ===== Event Handlers =====
 VibeLive.on('channelSelected', async (channel) => {
@@ -2165,31 +2072,14 @@ VibeLive.on('channelSelected', async (channel) => {
     if (self) {
         const camTile = createVideoTile(self.id, self.displayName, 'camera', true);
         if (camTile) {
+            // Append to DOM first, THEN registerTile (Element-First Rule)
             document.getElementById('previewArea').appendChild(camTile);
-            const vid = camTile.querySelector('video');
-            if (vid) VibeLive.setLocalCamera(vid);
+            VibeLive.registerTile(self.id, 'camera', camTile);
         }
     }
 
-    // Use the stream captured earlier during user gesture (iOS requires this)
-    try {
-        if (!previewStream) {
-            previewStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user' }, audio: false
-            });
-        }
-        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-        if (camTile) {
-            const vid = camTile.querySelector('video');
-            const ph = camTile.querySelector('.video-placeholder');
-            if (vid) {
-                vid.srcObject = previewStream;
-                vid.classList.add('visible');
-                await vid.play().catch(e => console.warn('Preview play failed:', e));
-            }
-            if (ph) ph.classList.add('hidden');
-        }
-    } catch (e) { console.warn('Pre-live preview:', e); }
+    // Camera ON, mic OFF for pre-live preview
+    try { await VibeLive.setVideo(true); } catch (e) { console.warn('Pre-live setVideo:', e); }
 });
 
 VibeLive.on('localJoined', async () => {
@@ -2210,12 +2100,7 @@ VibeLive.on('localJoined', async () => {
 VibeLive.on('localLeft', () => {
     if (isLeavingRoom) return;
 
-    document.querySelectorAll('#cameraGrid .video-tile').forEach(tile => {
-        if (tile.dataset.memberId !== VibeLive.memberId) {
-            tile.remove();
-        }
-    });
-
+    // Back to pre-live: move local tile back to preview, remote tiles handled by SDK
     const localCamTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
     if (localCamTile) {
         document.getElementById('previewArea').appendChild(localCamTile);
@@ -2229,29 +2114,19 @@ VibeLive.on('remoteJoined', (memberId) => {
     if (!VibeLive.isLive) return;
     const m = VibeLive.getMember(memberId);
     const tile = createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
-    if (tile) document.getElementById('cameraGrid').appendChild(tile);
+    if (tile) {
+        document.getElementById('cameraGrid').appendChild(tile);
+        VibeLive.registerTile(memberId, 'camera', tile);
+    }
     updateGridLayout();
 });
 
-VibeLive.on('remoteLeft', (memberId) => {
-    const m = VibeLive.getMember(memberId);
-    if (m?.displayStatus === 'EXITED') {
-        document.getElementById(`tile-${memberId}-camera`)?.remove();
-        updateGridLayout();
-    }
+// remoteLeft: tiles auto-removed by SDK when member exits (registered tiles).
+VibeLive.on('remoteLeft', () => {
+    updateGridLayout();
 });
 
-VibeLive.on('memberUpdate', (memberId) => {
-    const member = VibeLive.getMember(memberId);
-    if (!member) return;
-
-    // Update self controls when own status changes
-    if (memberId === VibeLive.memberId) {
-        updateLocalControlUI();
-    }
-
-    updateMemberIndicators(memberId);
-});
+// memberUpdate: covered by memberStateChange
 
 VibeLive.on('remoteStreamStart', (memberId, streamType) => {
     if (!VibeLive.isLive) return;
@@ -2263,91 +2138,86 @@ VibeLive.on('remoteStreamStart', (memberId, streamType) => {
 
     if (!tile) {
         tile = createVideoTile(memberId, m?.displayName || 'Unknown', 'camera', false);
-        if (tile) document.getElementById('cameraGrid').appendChild(tile);
-    }
-
-    if (!tile) return;
-
-    const placeholder = tile.querySelector('.video-placeholder');
-    const video = tile.querySelector('video');
-
-    if (placeholder) placeholder.classList.add('hidden');
-    if (video) {
-        video.classList.add('visible');
-        VibeLive.setRemoteCamera(memberId, video);
-    }
-
-    updateGridLayout();
-    updateMemberIndicators(memberId);
-});
-
-VibeLive.on('remoteStreamEnd', (memberId, streamType) => {
-    if (streamType === 'screenshare') return;
-    const tile = document.getElementById(`tile-${memberId}-camera`);
-    if (!tile) return;
-
-    const video = tile.querySelector('video');
-    const placeholder = tile.querySelector('.video-placeholder');
-    if (video) video.classList.remove('visible');
-    if (placeholder) placeholder.classList.remove('hidden');
-
-    updateGridLayout();
-    updateMemberIndicators(memberId);
-});
-
-VibeLive.on('remoteMediaChange', (memberId, streamType) => {
-    if (streamType === 'screenshare') return;
-    const states = VibeLive.getMediaStates(memberId);
-    const tile = document.getElementById(`tile-${memberId}-camera`);
-    if (!tile) return;
-
-    const video = tile.querySelector('video');
-    const placeholder = tile.querySelector('.video-placeholder');
-
-    const showPlaceholder = states.cam_video_detail !== 'ON';
-
-    if (showPlaceholder) {
-        video?.classList.remove('visible');
-        placeholder?.classList.remove('hidden');
-    } else {
-        video?.classList.add('visible');
-        placeholder?.classList.add('hidden');
-    }
-
-    updateMemberIndicators(memberId, streamType);
-});
-
-VibeLive.on('localMediaChange', () => {
-    const s = VibeLive.mediaState;
-
-    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-    if (camTile) {
-        const placeholder = camTile.querySelector('.video-placeholder');
-        const video = camTile.querySelector('video');
-        if (s.video) {
-            placeholder?.classList.add('hidden');
-            video?.classList.add('visible');
-        } else {
-            placeholder?.classList.remove('hidden');
-            video?.classList.remove('visible');
+        if (tile) {
+            document.getElementById('cameraGrid').appendChild(tile);
+            VibeLive.registerTile(memberId, 'camera', tile);
         }
     }
 
     updateGridLayout();
-    updateLocalControlUI();
-    updateMemberIndicators(VibeLive.memberId);
+});
+
+// remoteStreamEnd: tiles auto-removed by SDK for screenshare.
+// Camera tiles stay — memberStateChange handles visibility.
+
+// ---- Unified state handler -- indicators + visibility for ALL members ----
+VibeLive.on('memberStateChange', (memberId, state) => {
+    // state = { status, live, video, audio, screenVideo }
+    const camTileId = `tile-${memberId}-camera`;
+    const camTile = document.getElementById(camTileId);
+    if (!camTile) return;
+
+    const video = camTile.querySelector('video');
+    const placeholder = camTile.querySelector('.video-placeholder');
+    const videoOn = state.video === 'ON';
+
+    // Toggle video/placeholder visibility
+    if (videoOn) {
+        placeholder?.classList.add('hidden');
+        video?.classList.add('visible');
+    } else {
+        placeholder?.classList.remove('hidden');
+        video?.classList.remove('visible');
+    }
+
+    // Update indicators
+    const camInd = camTile.querySelector('.cam-video');
+    const micInd = camTile.querySelector('.cam-audio');
+    const audioOn = state.audio === 'ON';
+
+    if (camInd) {
+        camInd.classList.toggle('off', !videoOn);
+        camInd.innerHTML = videoOn ? ICONS.camOn : ICONS.camOff;
+    }
+    if (micInd) {
+        micInd.classList.toggle('off', !audioOn);
+        micInd.innerHTML = audioOn ? ICONS.micOn : ICONS.micOff;
+    }
+
+    // LIVE badge
+    const badge = camTile.querySelector('.status-badge');
+    if (badge) {
+        badge.className = 'status-badge';
+        if (state.live) {
+            badge.classList.add('live');
+            badge.textContent = 'LIVE';
+        } else {
+            badge.textContent = '';
+        }
+    }
+
+    // Update control buttons if this is the local member
+    if (memberId === VibeLive.memberId) {
+        updateLocalControlUI();
+    }
+
+    updateGridLayout();
+});
+
+VibeLive.on('warning', (context, message) => {
+    console.warn(`[VibeLive warning][${context}]`, message);
 });
 
 VibeLive.on('error', (context, error) => {
     console.error('VibeLive error:', context, error);
     // Suppress non-critical media toggle errors
-    const suppress = ['toggleVideo', 'toggleAudio', 'toggleMuteAudio'];
+    const suppress = ['setVideo', 'setAudio', 'setAudioMuted', 'setScreenshare'];
     if (suppress.includes(context)) return;
     showError(friendlyError(error || { message: context }));
 });
 
 VibeLive.on('kicked', (message) => {
-    // Server ended the meeting — don't call exitRoom(), SDK already cleaned up
+    VibeLive.exitRoom(); // Clean up, SDK auto-removes registered tiles
     teardown();
 
     const overlay = document.getElementById('kickedOverlay');
@@ -2363,8 +2233,8 @@ window.closeKickedModal = () => {
 function updateLocalControlUI() {
     const s = VibeLive.mediaState;
 
-    const camOn = s.video;
-    const micOn = s.audio && !s.audioMuted;
+    const camOn = s.videoDetail === 'ON';
+    const micOn = s.audioDetail === 'ON';
 
     // Pre-live buttons
     const preCamBtn = document.getElementById('preCamBtn');

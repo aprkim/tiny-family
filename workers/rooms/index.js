@@ -6,7 +6,7 @@ const CORS = {
 
 const RESERVED = new Set(["api", "in", "assets", "proxy", "workers", "manifest", "favicon"]);
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,19}$/;
-const TTL = 60 * 60 * 24; // 24 hours
+// No TTL — room names persist until explicitly deleted
 
 function json(data, status = 200) {
   return Response.json(data, { status, headers: CORS });
@@ -71,7 +71,7 @@ export default {
         data.pin = body.pin;
       }
 
-      await env.ROOMS.put(name, JSON.stringify(data), { expirationTtl: TTL });
+      await env.ROOMS.put(name, JSON.stringify(data));
       return json(data);
     }
 
