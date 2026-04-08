@@ -1657,6 +1657,8 @@ window.flipCamera = async () => {
             const isFront = next.label?.toLowerCase().includes('front') || cameras.indexOf(next) === 0;
             video.style.transform = isFront ? 'scaleX(-1)' : 'none';
             VibeLive.setLocalCamera(video);
+            // Re-sync VibeLive state so it knows video is still on
+            await VibeLive.setVideo(true);
 
             if (oldStream) oldStream.getVideoTracks().forEach(t => t.stop());
         }
