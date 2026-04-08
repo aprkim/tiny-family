@@ -1135,7 +1135,13 @@ VibeLive.init({
     projectKey: 'vlk_ZCws27SoJrjnl0GIZdHCVXji'
 });
 
-// Dark mode only — no theme toggle
+// Auto-detect OS/browser theme preference
+if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+    document.documentElement.setAttribute('data-theme', 'light');
+}
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+});
 
 // ===== Entry Screen Logic =====
 const codeInput = document.getElementById('codeInput');
