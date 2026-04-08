@@ -1650,47 +1650,26 @@ window.toggleLiveCam = () => {
 };
 
 // ===== Flip Camera (mobile only) =====
-let usingFrontCamera = true;
+let currentCameraIndex = 0;
 
 window.flipCamera = async () => {
     try {
+        const devices = await VibeLive.getDevices();
+        const cameras = devices.filter(d => d.kind === 'videoinput');
+        if (cameras.length < 2) { showToast('Only one camera available'); return; }
+
+        currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+        await VibeLive.setCamera(cameras[currentCameraIndex].deviceId);
+
+        // Mirror front camera only
         const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-        if (!camTile) return;
-        const video = camTile.querySelector('video');
-        if (!video) return;
-
-        const targetMode = usingFrontCamera ? 'environment' : 'user';
-
-        // Try exact facingMode first, fall back to deviceId
-        let stream;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { exact: targetMode } },
-                audio: false
-            });
-        } catch {
-            // exact failed — find a different camera by deviceId
-            const currentTrack = video.srcObject?.getVideoTracks()[0];
-            const currentId = currentTrack?.getSettings()?.deviceId;
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = devices.filter(d => d.kind === 'videoinput');
-            const other = cameras.find(c => c.deviceId !== currentId);
-            if (!other) { showToast('No other camera found'); return; }
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: other.deviceId } },
-                audio: false
-            });
-        }
-
-        const oldStream = video.srcObject;
-        video.srcObject = stream;
-        usingFrontCamera = !usingFrontCamera;
-        video.style.transform = usingFrontCamera ? 'scaleX(-1)' : 'none';
-        VibeLive.setLocalCamera(video); // Re-register after stream swap
-
-        // Stop old tracks AFTER VibeLive has the new stream
-        if (oldStream) {
-            oldStream.getVideoTracks().forEach(t => t.stop());
+        if (camTile) {
+            const video = camTile.querySelector('video');
+            if (video) {
+                const isFront = cameras[currentCameraIndex].label?.toLowerCase().includes('front') ||
+                                currentCameraIndex === 0;
+                video.style.transform = isFront ? 'scaleX(-1)' : 'none';
+            }
         }
     } catch (e) {
         showToast('Could not switch camera');
@@ -2209,10 +2188,64 @@ VibeLive.on('warning', (context, message) => {
 });
 
 VibeLive.on('error', (context, error) => {
-    console.error('VibeLive error:', context, error);
-    // Suppress non-critical media toggle errors
+    const code = error?.code || '';
+
+    // Dev bugs: log only, never show to user
+    if (code.startsWith('INIT_') || code.startsWith('STATE_') || code === 'INVALID_PARAM') {
+        console.error(`[VibeLive dev][${context}]`, code, error.message);
+        return;
+    }
+
+    // Screenshare cancelled: user chose to cancel, silently ignore
+    if (code === 'SCREENSHARE_CANCELLED') return;
+
+    // Room kicked: handled by 'kicked' event
+    if (code === 'ROOM_KICKED') return;
+
+    // Room full or disabled: show message, return to entry
+    if (code === 'ROOM_FULL') {
+        showError('This room is full. Please try again later.');
+        return;
+    }
+    if (code === 'ROOM_DISABLED') {
+        showError('This room is no longer available.');
+        teardown();
+        return;
+    }
+
+    // Media permission denied: longer toast
+    if (code === 'MEDIA_PERMISSION_DENIED') {
+        showError('Camera/mic access denied. Check your browser settings.');
+        return;
+    }
+
+    // Media device busy: suggest retry
+    if (code === 'MEDIA_DEVICE_BUSY') {
+        showError('Camera is in use by another app. Close it and try again.');
+        return;
+    }
+
+    // Network disconnected: subtle indicator
+    if (code === 'NETWORK_WS_DISCONNECTED' || code === 'NETWORK_OFFLINE') {
+        showToast('Reconnecting...');
+        return;
+    }
+
+    // Non-critical media errors: suppress
     const suppress = ['setVideo', 'setAudio', 'setAudioMuted', 'setScreenshare'];
-    if (suppress.includes(context)) return;
+    if (suppress.includes(context)) {
+        console.warn(`[VibeLive][${context}]`, code, error.message);
+        return;
+    }
+
+    // Retriable errors: show with hint
+    if (error?.retriable) {
+        showError(error.hint || error.message || 'Something went wrong. Please try again.');
+        return;
+    }
+
+    // Default: show friendly message
+    console.error(`[VibeLive][${context}]`, code, error.message);
     showError(friendlyError(error || { message: context }));
 });
 
