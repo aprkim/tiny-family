@@ -2139,6 +2139,7 @@ VibeLive.on('memberStateChange', (memberId, state) => {
     const video = camTile.querySelector('video');
     const placeholder = camTile.querySelector('.video-placeholder');
     const videoOn = state.video === 'ON';
+    const audioOn = state.audio === 'ON';
 
     // Toggle video/placeholder visibility
     if (videoOn) {
@@ -2149,10 +2150,20 @@ VibeLive.on('memberStateChange', (memberId, state) => {
         video?.classList.remove('visible');
     }
 
-    // Update indicators
-    const camInd = camTile.querySelector('.cam-video');
-    const micInd = camTile.querySelector('.cam-audio');
-    const audioOn = state.audio === 'ON';
+    // Update tile indicators
+    updateTileIndicators(camTile, videoOn, audioOn, state.live);
+
+    // Update control buttons if this is the local member
+    if (memberId === VibeLive.memberId) {
+        updateControlButtons(videoOn, audioOn);
+    }
+
+    updateGridLayout();
+});
+
+function updateTileIndicators(tile, videoOn, audioOn, isLive) {
+    const camInd = tile.querySelector('.cam-video');
+    const micInd = tile.querySelector('.cam-audio');
 
     if (camInd) {
         camInd.classList.toggle('off', !videoOn);
@@ -2163,25 +2174,38 @@ VibeLive.on('memberStateChange', (memberId, state) => {
         micInd.innerHTML = audioOn ? ICONS.micOn : ICONS.micOff;
     }
 
-    // LIVE badge
-    const badge = camTile.querySelector('.status-badge');
+    const badge = tile.querySelector('.status-badge');
     if (badge) {
         badge.className = 'status-badge';
-        if (state.live) {
+        if (isLive) {
             badge.classList.add('live');
             badge.textContent = 'LIVE';
         } else {
             badge.textContent = '';
         }
     }
+}
 
-    // Update control buttons if this is the local member
-    if (memberId === VibeLive.memberId) {
-        updateLocalControlUI();
-    }
+function updateControlButtons(camOn, micOn) {
+    const preCamBtn = document.getElementById('preCamBtn');
+    const preMicBtn = document.getElementById('preMicBtn');
+    const liveCamBtn = document.getElementById('liveCamBtn');
+    const liveMicBtn = document.getElementById('liveMicBtn');
 
-    updateGridLayout();
-});
+    [preCamBtn, liveCamBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle('active', camOn);
+        btn.classList.toggle('off', !camOn);
+        btn.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
+    });
+
+    [preMicBtn, liveMicBtn].forEach(btn => {
+        if (!btn) return;
+        btn.classList.toggle('active', micOn);
+        btn.classList.toggle('off', !micOn);
+        btn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
+    });
+}
 
 VibeLive.on('warning', (context, message) => {
     console.warn(`[VibeLive warning][${context}]`, message);
@@ -2262,47 +2286,16 @@ window.closeKickedModal = () => {
     document.getElementById('kickedOverlay').style.display = 'none';
 };
 
-// ===== Update Control Button States =====
+// updateLocalControlUI: now driven by memberStateChange via updateControlButtons
 function updateLocalControlUI() {
-    const s = VibeLive.mediaState;
+    const state = VibeLive.getMemberState(VibeLive.memberId);
+    if (!state) return;
+    const camOn = state.video === 'ON';
+    const micOn = state.audio === 'ON';
+    updateControlButtons(camOn, micOn);
 
-    const camOn = s.videoDetail === 'ON';
-    const micOn = s.audioDetail === 'ON';
-
-    // Pre-live buttons
-    const preCamBtn = document.getElementById('preCamBtn');
-    const preMicBtn = document.getElementById('preMicBtn');
-    preCamBtn.classList.toggle('active', camOn);
-    preCamBtn.classList.toggle('off', !camOn);
-    preCamBtn.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
-    preMicBtn.classList.toggle('active', micOn);
-    preMicBtn.classList.toggle('off', !micOn);
-    preMicBtn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
-
-    // Live buttons
-    const liveCamBtn = document.getElementById('liveCamBtn');
-    const liveMicBtn = document.getElementById('liveMicBtn');
-    liveCamBtn.classList.toggle('active', camOn);
-    liveCamBtn.classList.toggle('off', !camOn);
-    liveCamBtn.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
-    liveMicBtn.classList.toggle('active', micOn);
-    liveMicBtn.classList.toggle('off', !micOn);
-    liveMicBtn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
-
-    // Sync tile indicators with control buttons (in case memberStateChange hasn't fired yet)
     const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-    if (camTile) {
-        const camInd = camTile.querySelector('.cam-video');
-        const micInd = camTile.querySelector('.cam-audio');
-        if (camInd) {
-            camInd.classList.toggle('off', !camOn);
-            camInd.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
-        }
-        if (micInd) {
-            micInd.classList.toggle('off', !micOn);
-            micInd.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
-        }
-    }
+    if (camTile) updateTileIndicators(camTile, camOn, micOn, state.live);
 }
 </script>
 </body>
