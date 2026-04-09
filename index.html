@@ -2288,6 +2288,21 @@ function updateLocalControlUI() {
     liveMicBtn.classList.toggle('active', micOn);
     liveMicBtn.classList.toggle('off', !micOn);
     liveMicBtn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
+
+    // Sync tile indicators with control buttons (in case memberStateChange hasn't fired yet)
+    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+    if (camTile) {
+        const camInd = camTile.querySelector('.cam-video');
+        const micInd = camTile.querySelector('.cam-audio');
+        if (camInd) {
+            camInd.classList.toggle('off', !camOn);
+            camInd.innerHTML = camOn ? ICONS.camOn : ICONS.camOff;
+        }
+        if (micInd) {
+            micInd.classList.toggle('off', !micOn);
+            micInd.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
+        }
+    }
 }
 </script>
 </body>
