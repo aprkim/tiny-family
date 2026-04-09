@@ -2148,6 +2148,7 @@ VibeLive.on('remoteStreamStart', (memberId, streamType) => {
 // ---- Unified state handler -- indicators + visibility for ALL members ----
 VibeLive.on('memberStateChange', (memberId, state) => {
     // state = { status, live, video, audio, screenVideo }
+    console.log('[memberStateChange]', memberId, JSON.stringify(state));
     const camTileId = `tile-${memberId}-camera`;
     const camTile = document.getElementById(camTileId);
     if (!camTile) return;
@@ -2222,6 +2223,31 @@ function updateControlButtons(camOn, micOn) {
         btn.innerHTML = micOn ? ICONS.micOn : ICONS.micOff;
     });
 }
+
+// Fallback: remoteMediaChange for SDKs where memberStateChange doesn't cover remote mute
+VibeLive.on('remoteMediaChange', (memberId, streamType) => {
+    if (streamType === 'screenshare') return;
+    const tile = document.getElementById(`tile-${memberId}-camera`);
+    if (!tile) return;
+
+    const states = VibeLive.getMediaStates(memberId);
+    if (!states) return;
+
+    const videoOn = states.videoDetail === 'ON';
+    const audioOn = states.audioDetail === 'ON';
+
+    updateTileIndicators(tile, videoOn, audioOn, true);
+
+    const video = tile.querySelector('video');
+    const placeholder = tile.querySelector('.video-placeholder');
+    if (videoOn) {
+        placeholder?.classList.add('hidden');
+        video?.classList.add('visible');
+    } else {
+        placeholder?.classList.remove('hidden');
+        video?.classList.remove('visible');
+    }
+});
 
 VibeLive.on('warning', (context, message) => {
     console.warn(`[VibeLive warning][${context}]`, message);
