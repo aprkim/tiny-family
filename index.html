@@ -129,88 +129,85 @@ input::placeholder { color: var(--muted2); }
 #entryScreen {
     align-items: center;
     justify-content: center;
-    gap: 1rem;
-    padding: 1rem;
-    padding-top: max(1rem, env(safe-area-inset-top));
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    gap: 2rem;
+    padding: 1.5rem;
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
     overflow-y: auto;
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .entry-header {
     text-align: center;
-    margin-bottom: 0.5rem;
+}
+
+.entry-header .brand {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
 }
 
 .entry-header h1 {
-    font-size: 1.6rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
     color: var(--text);
-}
-
-.entry-header p {
-    color: var(--muted);
-    font-size: 0.85rem;
-    margin-top: 0.3rem;
-}
-
-.entry-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    width: 100%;
-    max-width: 100%;
-}
-
-.entry-card label {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--muted);
-    margin-bottom: 0.45rem;
+    line-height: 1.2;
 }
 
 .entry-hint {
-    font-size: 0.75rem;
-    color: var(--dangerText);
-    margin-top: 0.35rem;
+    font-size: 0.78rem;
+    color: var(--accent);
+    margin-top: 0.4rem;
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity 0.2s;
+    height: 1.2em;
 }
 
 .entry-hint.show { opacity: 1; }
 
+.standalone-input {
+    font-family: var(--sans);
+    font-size: 1rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.standalone-input:focus { border-color: var(--accent); }
+.standalone-input::placeholder { color: var(--muted2); }
+
 .btn-primary {
     background: var(--accent);
     color: #fff;
-    font-weight: 600;
+    font-weight: 700;
     width: 100%;
-    padding: 0.85rem;
-    font-size: 1rem;
+    padding: 1rem;
+    font-size: 1.1rem;
+    letter-spacing: -0.01em;
 }
 
 .btn-primary:hover { background: var(--accentHover); }
-.btn-primary:disabled { cursor: not-allowed; }
-
-.btn-create {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    padding: 0.85rem;
-    font-size: 1rem;
-}
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .entry-divider {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin: 1rem 0;
     color: var(--muted2);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-size: 0.8rem;
+    font-weight: 500;
 }
 
 .entry-divider::before,
@@ -227,28 +224,46 @@ input::placeholder { color: var(--muted2); }
     flex-wrap: nowrap;
 }
 
-.entry-join-row input { flex: 1; min-width: 0; }
+.entry-join-row input {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--sans);
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
 
-.entry-join-row .btn-join {
-    flex: 0 0 30% !important;
-    width: auto !important;
-    border-radius: calc(var(--radius) * 0.5);
-    padding: 0.6rem 0;
-    font-size: 0.9rem;
+.entry-join-row input:focus { border-color: var(--accent); }
+.entry-join-row input::placeholder { color: var(--muted2); }
+
+.btn-secondary {
+    font-family: var(--sans);
+    flex: 0 0 auto;
+    padding: 0.75rem 1.4rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--soft);
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    width: auto;
     white-space: nowrap;
 }
 
-.btn-secondary {
-    background: var(--soft);
-    color: var(--text);
-    border: 1px solid var(--border);
-    width: 100%;
-    padding: 0.7rem;
-    font-weight: 600;
-}
-
 .btn-secondary:hover { background: var(--border); }
-.btn-secondary:disabled { cursor: not-allowed; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.microcopy {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted2);
+    line-height: 1.4;
+}
 
 
 /* ===== Pre-Live Screen ===== */
@@ -940,10 +955,7 @@ input::placeholder { color: var(--muted2); }
     .ctrl-btn.leave { margin-left: 1rem; }
 }
 
-/* Entry card max-width on larger screens */
 @media (min-width: 481px) {
-    .entry-card { max-width: 420px; }
-    #entryScreen { padding: 1.5rem; padding-top: max(1.5rem, env(safe-area-inset-top)); }
     .prelive-preview { width: min(70%, calc((100vh - 160px) * 16 / 9 * 0.7)); max-width: 840px; }
 }
 
@@ -981,38 +993,31 @@ input::placeholder { color: var(--muted2); }
 <!-- ===== Entry Screen ===== -->
 <div id="entryScreen" class="screen active">
     <div class="entry-header">
-        <h1>TinyFamily</h1>
-        <p>Family video chat</p>
+        <p class="brand">FamilyCall</p>
+        <h1>Stay close, even far away</h1>
     </div>
 
-    <div class="entry-card">
-        <label for="nameInput">Your name</label>
-        <input type="text" id="nameInput" placeholder="Enter your name" maxlength="24" autocomplete="off" autofocus>
+    <div>
+        <input type="text" id="nameInput" class="standalone-input" placeholder="Enter your name" maxlength="24" autocomplete="off" autofocus>
         <div id="nameHint" class="entry-hint">Please enter your name first</div>
     </div>
 
-    <div class="entry-card">
-        <button id="btnCreate" class="btn-primary btn-create" onclick="window.createRoom()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Start a Room
-        </button>
+    <button id="btnCreate" class="btn-primary" onclick="window.createRoom()">Start call</button>
 
-        <div class="entry-divider">
-            <span>OR</span>
-        </div>
+    <div class="entry-divider"><span>or</span></div>
 
-        <div id="codeSection">
-            <label for="codeInput">Join with room code</label>
-        </div>
+    <div id="codeSection">
         <div class="entry-join-row">
-            <input type="text" id="codeInput" placeholder="E.G. ABC123" maxlength="12" autocomplete="off">
-            <button id="btnJoin" class="btn-join btn-secondary" onclick="window.joinRoom()">Join</button>
-        </div>
-        <div id="pinSection" class="entry-join-row" style="display:none; margin-top:0.5rem;">
-            <input type="tel" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="flex:1;text-align:center;letter-spacing:0.2em;font-size:16px;">
-            <button id="btnPinJoin" class="btn-join btn-primary" onclick="window.joinRoom()">Join</button>
+            <input type="text" id="codeInput" placeholder="Enter code (e.g. ABC123)" maxlength="12" autocomplete="off">
+            <button id="btnJoin" class="btn-secondary" onclick="window.joinRoom()">Join</button>
         </div>
     </div>
+    <div id="pinSection" class="entry-join-row" style="display:none;">
+        <input type="tel" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="flex:1;text-align:center;letter-spacing:0.2em;font-size:16px;">
+        <button id="btnPinJoin" class="btn-primary" onclick="window.joinRoom()" style="flex:0 0 auto;padding:0.75rem 1.4rem;font-size:0.95rem;">Join</button>
+    </div>
+
+    <p class="microcopy">Up to 4 people &middot; Flip camera anytime</p>
 </div>
 
 <!-- ===== Pre-Live Screen ===== -->
@@ -1352,7 +1357,7 @@ window.createRoom = async () => {
     localName = name;
 
     btnCreate.disabled = true;
-    btnCreate.innerHTML = '<span class="spinner"></span>Creating...';
+    btnCreate.textContent = 'Creating...';
     isHost = true;
 
     try {
@@ -1362,7 +1367,7 @@ window.createRoom = async () => {
     } catch (e) {
         showError(friendlyError(e));
         btnCreate.disabled = false;
-        btnCreate.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a Room';
+        btnCreate.textContent = 'Start call';
     }
 };
 
@@ -1559,7 +1564,7 @@ function teardown() {
     codeInput.style.display = '';
     btnJoin.style.display = '';
     btnCreate.disabled = false;
-    btnCreate.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Start a Room';
+    btnCreate.textContent = 'Start call';
     btnJoin.disabled = false;
     btnJoin.textContent = 'Join';
     updateEntryButtons();
