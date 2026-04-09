@@ -1612,7 +1612,9 @@ window.goLive = async () => {
         await Promise.race([VibeLive.startLive(), timeout]);
 
         // Set media state respecting pre-live choices
+        // Sequential with delays — iOS Safari can fail with rapid getUserMedia calls
         await VibeLive.setVideo(preCamOn);
+        await new Promise(r => setTimeout(r, 100));
         await VibeLive.setAudio(true);
         if (!preMicOn) await VibeLive.setAudioMuted(true);
     } catch (e) {
@@ -1648,12 +1650,11 @@ window.flipCamera = async () => {
             const cameras = devices.cameras || devices.filter?.(d => d.kind === 'videoinput') || [];
             if (cameras.length < 2) { showToast('Only one camera available'); return; }
 
-            // Find a camera with the opposite facing mode
-            const targetFacing = usingFrontCamera ? 'environment' : 'user';
+            // Find a camera with the opposite facing mode by label
             const target = cameras.find(c =>
-                c.getCapabilities?.()?.facingMode?.includes(targetFacing)
-            ) || cameras.find(c =>
-                c.label?.toLowerCase().includes(usingFrontCamera ? 'back' : 'front')
+                usingFrontCamera
+                    ? /back|rear|environment/i.test(c.label || '')
+                    : /front|user/i.test(c.label || '')
             ) || cameras[usingFrontCamera ? cameras.length - 1 : 0];
 
             await VibeLive.setCamera(target.deviceId);
@@ -1739,7 +1740,12 @@ function createVideoTile(memberId, name, streamType, isLocal) {
     const video = document.createElement('video');
     video.autoplay = true;
     video.playsInline = true;
-    video.muted = isLocal;
+    video.setAttribute('webkit-playsinline', '');
+    video.muted = (isLocal || streamType === 'screenshare');
+    // Ensure playback starts on mobile (autoplay may be blocked for unmuted)
+    video.addEventListener('loadedmetadata', () => {
+        video.play().catch(() => {});
+    });
     if (isLocal && streamType === 'camera') {
         video.style.transform = 'scaleX(-1)';
     }
