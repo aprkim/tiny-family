@@ -1658,15 +1658,23 @@ window.flipCamera = async () => {
             await VibeLive.setCamera(target.deviceId);
             usingFrontCamera = !usingFrontCamera;
         } else {
-            // Fallback: use facingMode constraint (front ↔ back)
+            // Fallback: enumerate devices and pick front/back by label or position
             const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
             if (!camTile) return;
             const video = camTile.querySelector('video');
             if (!video) return;
 
-            const targetMode = usingFrontCamera ? 'environment' : 'user';
+            const allDevices = await navigator.mediaDevices.enumerateDevices();
+            const cameras = allDevices.filter(d => d.kind === 'videoinput');
+            if (cameras.length < 2) { showToast('Only one camera available'); return; }
+
+            // Find front and back cameras by label
+            const backCam = cameras.find(c => /back|rear|environment/i.test(c.label));
+            const frontCam = cameras.find(c => /front|user/i.test(c.label)) || cameras[0];
+            const targetCam = usingFrontCamera ? (backCam || cameras[cameras.length - 1]) : (frontCam || cameras[0]);
+
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { exact: targetMode } }, audio: false
+                video: { deviceId: { exact: targetCam.deviceId } }, audio: false
             });
 
             const oldStream = video.srcObject;
