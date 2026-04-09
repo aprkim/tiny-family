@@ -1428,6 +1428,21 @@ function updatePreLiveButtons() {
         preMicBtn.classList.toggle('off', !preMicOn);
         preMicBtn.innerHTML = preMicOn ? ICONS.micOn : ICONS.micOff;
     }
+
+    // Sync tile indicator to match pre-live intent (mic not started yet)
+    const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+    if (camTile) {
+        const micInd = camTile.querySelector('.cam-audio');
+        if (micInd) {
+            micInd.classList.toggle('off', !preMicOn);
+            micInd.innerHTML = preMicOn ? ICONS.micOn : ICONS.micOff;
+        }
+        const camInd = camTile.querySelector('.cam-video');
+        if (camInd) {
+            camInd.classList.toggle('off', !preCamOn);
+            camInd.innerHTML = preCamOn ? ICONS.camOn : ICONS.camOff;
+        }
+    }
 }
 
 // ===== Click-to-Edit Room Name =====
@@ -2059,6 +2074,7 @@ VibeLive.on('channelSelected', async (channel) => {
 
     // Camera ON, mic OFF for pre-live preview
     try { await VibeLive.setVideo(true); } catch (e) { console.warn('Pre-live setVideo:', e); }
+    updatePreLiveButtons();
 });
 
 VibeLive.on('localJoined', async () => {
