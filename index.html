@@ -315,7 +315,7 @@ input::placeholder { color: var(--muted2); }
 
 #previewArea {
     position: absolute;
-    inset: 0;
+    top: 0; right: 0; bottom: 0; left: 0;
 }
 
 #previewArea .video-tile {
@@ -553,12 +553,12 @@ input::placeholder { color: var(--muted2); }
 
 .video-container {
     position: absolute;
-    inset: 0;
+    top: 0; right: 0; bottom: 0; left: 0;
 }
 
 .video-placeholder {
     position: absolute;
-    inset: 0;
+    top: 0; right: 0; bottom: 0; left: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -585,7 +585,7 @@ input::placeholder { color: var(--muted2); }
 
 .video-container video {
     position: absolute;
-    inset: 0;
+    top: 0; right: 0; bottom: 0; left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -706,6 +706,7 @@ input::placeholder { color: var(--muted2); }
     justify-content: center;
     padding: 0;
     background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     color: #fff;
@@ -1828,10 +1829,11 @@ function updateGridLayout() {
 
 // ===== Tile Fullscreen =====
 function toggleTileFullscreen(tile, btn) {
-    if (document.fullscreenElement === tile) {
-        document.exitFullscreen().catch(() => {});
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl === tile) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
     } else {
-        (tile.requestFullscreen || tile.webkitRequestFullscreen).call(tile).catch((err) => {
+        (tile.requestFullscreen || tile.webkitRequestFullscreen).call(tile).catch(() => {
             showError('Fullscreen not available');
         });
     }
@@ -1864,17 +1866,19 @@ function toggleSpotlight(tile, btn) {
     updateGridLayout();
 }
 
-document.addEventListener('fullscreenchange', () => {
+function onFullscreenChange() {
     document.querySelectorAll('.tile-actions .tile-action-btn').forEach(btn => {
         const tile = btn.closest('.video-tile');
         if (!tile) return;
-        const isFs = document.fullscreenElement === tile;
+        const isFs = (document.fullscreenElement || document.webkitFullscreenElement) === tile;
         btn.innerHTML = isFs
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
         btn.title = isFs ? 'Exit fullscreen' : 'Toggle fullscreen';
     });
-});
+}
+document.addEventListener('fullscreenchange', onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
 // ===== Draggable Tiles =====
 let dragState = null;
