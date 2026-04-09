@@ -127,16 +127,18 @@ input::placeholder { color: var(--muted2); }
 
 /* ===== Entry Screen ===== */
 #entryScreen {
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
-    gap: 2rem;
     padding: 1.5rem;
-    padding-top: max(1.5rem, env(safe-area-inset-top));
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
     overflow-y: auto;
-    max-width: calc(400px + 3rem);
-    margin: 0 auto;
+}
+
+#entryScreen .entry-inner {
     width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
 }
 
 .entry-header {
@@ -992,6 +994,7 @@ input::placeholder { color: var(--muted2); }
 
 <!-- ===== Entry Screen ===== -->
 <div id="entryScreen" class="screen active">
+<div class="entry-inner">
     <div class="entry-header">
         <p class="brand">FamilyCall</p>
         <h1>Stay close, even far away</h1>
@@ -1018,6 +1021,7 @@ input::placeholder { color: var(--muted2); }
     </div>
 
     <p class="microcopy">Up to 4 people &middot; Flip camera anytime</p>
+</div>
 </div>
 
 <!-- ===== Pre-Live Screen ===== -->
