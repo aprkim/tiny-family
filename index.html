@@ -1610,60 +1610,60 @@ window.toggleLiveCam = () => {
 };
 
 // ===== Flip Camera (mobile only) =====
-let currentCameraIndex = 0;
+let usingFrontCamera = true;
+let flipping = false;
 
 window.flipCamera = async () => {
+    if (flipping) return;
+    flipping = true;
     try {
-        // Try SDK method first (v0.81+), fall back to manual getUserMedia
-        if (typeof VibeLive.getDevices === 'function') {
+        // Try SDK method first (v0.81+)
+        if (typeof VibeLive.getDevices === 'function' && typeof VibeLive.setCamera === 'function') {
             const devices = await VibeLive.getDevices();
             const cameras = devices.cameras || devices.filter?.(d => d.kind === 'videoinput') || [];
             if (cameras.length < 2) { showToast('Only one camera available'); return; }
 
-            currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
-            await VibeLive.setCamera(cameras[currentCameraIndex].deviceId);
+            // Find a camera with the opposite facing mode
+            const targetFacing = usingFrontCamera ? 'environment' : 'user';
+            const target = cameras.find(c =>
+                c.getCapabilities?.()?.facingMode?.includes(targetFacing)
+            ) || cameras.find(c =>
+                c.label?.toLowerCase().includes(usingFrontCamera ? 'back' : 'front')
+            ) || cameras[usingFrontCamera ? cameras.length - 1 : 0];
 
-            const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
-            if (camTile) {
-                const video = camTile.querySelector('video');
-                if (video) {
-                    const isFront = cameras[currentCameraIndex].label?.toLowerCase().includes('front') ||
-                                    currentCameraIndex === 0;
-                    video.style.transform = isFront ? 'scaleX(-1)' : 'none';
-                }
-            }
+            await VibeLive.setCamera(target.deviceId);
+            usingFrontCamera = !usingFrontCamera;
         } else {
-            // Fallback: manual getUserMedia for older SDK versions
+            // Fallback: use facingMode constraint (front ↔ back)
             const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
             if (!camTile) return;
             const video = camTile.querySelector('video');
             if (!video) return;
 
-            const currentTrack = video.srcObject?.getVideoTracks()[0];
-            const currentId = currentTrack?.getSettings()?.deviceId;
-            const allDevices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = allDevices.filter(d => d.kind === 'videoinput');
-            if (cameras.length < 2) { showToast('Only one camera available'); return; }
-
-            const curIdx = cameras.findIndex(c => c.deviceId === currentId);
-            const next = cameras[(curIdx + 1) % cameras.length];
-
+            const targetMode = usingFrontCamera ? 'environment' : 'user';
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: next.deviceId } }, audio: false
+                video: { facingMode: { exact: targetMode } }, audio: false
             });
 
             const oldStream = video.srcObject;
             video.srcObject = stream;
-            const isFront = next.label?.toLowerCase().includes('front') || cameras.indexOf(next) === 0;
-            video.style.transform = isFront ? 'scaleX(-1)' : 'none';
+            usingFrontCamera = !usingFrontCamera;
             VibeLive.setLocalCamera(video);
-            // Re-sync VibeLive state so it knows video is still on
             await VibeLive.setVideo(true);
 
             if (oldStream) oldStream.getVideoTracks().forEach(t => t.stop());
         }
+
+        // Mirror front camera only
+        const camTile = document.getElementById(`tile-${VibeLive.memberId}-camera`);
+        if (camTile) {
+            const video = camTile.querySelector('video');
+            if (video) video.style.transform = usingFrontCamera ? 'scaleX(-1)' : 'none';
+        }
     } catch (e) {
         showToast('Could not switch camera');
+    } finally {
+        flipping = false;
     }
 };
 
