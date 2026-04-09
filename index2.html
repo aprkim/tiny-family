@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>TinyFamily</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%23BF3143'/%3E%3Crect x='5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3Crect x='17.5' y='17.5' width='9.5' height='9.5' rx='2.5' fill='white' opacity='0.9'/%3E%3C/svg%3E">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg: #FFF8F6;
+    --card: #ffffff;
+    --text: #2D1F1F;
+    --muted: #8B7676;
+    --muted2: #B8A6A6;
+    --accent: #D4495A;
+    --accentHover: #C13A4B;
+    --accentSoft: rgba(212,73,90,.08);
+    --border: #F0E0DE;
+    --soft: #FFF0ED;
+    --radius: 20px;
+    --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+
+html, body {
+    height: 100%;
+    height: 100dvh;
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.landing {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+/* ===== Header ===== */
+.header {
+    text-align: center;
+    padding-top: 0.5rem;
+}
+
+.header h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.header .subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    font-weight: 400;
+}
+
+.header .features {
+    font-size: 0.78rem;
+    color: var(--muted2);
+    margin-top: 0.6rem;
+    letter-spacing: 0.01em;
+}
+
+/* ===== Video Grid Hint ===== */
+.grid-hint {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.grid-hint .avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.grid-hint .avatar:nth-child(1) { background: #D4495A; }
+.grid-hint .avatar:nth-child(2) { background: #E8836D; }
+.grid-hint .avatar:nth-child(3) { background: #F2A65A; }
+.grid-hint .avatar:nth-child(4) { background: #6BAFA0; }
+
+/* ===== Card ===== */
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+}
+
+.card label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+}
+
+.card input {
+    font-family: var(--sans);
+    font-size: 1rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    background: var(--soft);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.card input:focus { border-color: var(--accent); }
+.card input::placeholder { color: var(--muted2); }
+
+/* ===== Primary CTA ===== */
+.cta-btn {
+    font-family: var(--sans);
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: calc(var(--radius) * 0.7);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    letter-spacing: -0.01em;
+}
+
+.cta-btn:hover { background: var(--accentHover); }
+.cta-btn:active { transform: scale(0.98); }
+.cta-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== Divider ===== */
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted2);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+/* ===== Join Row ===== */
+.join-section label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+}
+
+.join-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.join-row input {
+    font-family: var(--sans);
+    flex: 1;
+    min-width: 0;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    background: var(--soft);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.join-row input:focus { border-color: var(--accent); }
+.join-row input::placeholder { color: var(--muted2); }
+
+.join-btn {
+    font-family: var(--sans);
+    flex: 0 0 auto;
+    padding: 0.75rem 1.4rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--soft);
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.join-btn:hover { background: var(--border); }
+.join-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== Microcopy ===== */
+.microcopy {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--muted2);
+    line-height: 1.4;
+}
+
+/* ===== Hint ===== */
+.name-hint {
+    font-size: 0.78rem;
+    color: var(--accent);
+    margin-top: 0.4rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    height: 1.2em;
+}
+
+.name-hint.show { opacity: 1; }
+
+/* ===== Dark mode ===== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1A1212;
+        --card: #231A1A;
+        --text: #F0E6E6;
+        --muted: #A89494;
+        --muted2: #7A6868;
+        --accent: #E05A6B;
+        --accentHover: #D44B5C;
+        --accentSoft: rgba(224,90,107,.12);
+        --border: #3A2C2C;
+        --soft: #2A1F1F;
+    }
+}
+
+</style>
+</head>
+<body>
+
+<div class="landing">
+    <!-- Header -->
+    <div class="header">
+        <h1>Stay close, even far away</h1>
+        <p class="subtitle">Simple video calls for your family</p>
+        <p class="features">Up to 4 people &middot; Easy camera flip</p>
+    </div>
+
+    <!-- Video grid hint -->
+    <div class="grid-hint">
+        <div class="avatar">M</div>
+        <div class="avatar">D</div>
+        <div class="avatar">H</div>
+        <div class="avatar">G</div>
+    </div>
+
+    <!-- Name input -->
+    <div class="card">
+        <label for="nameInput">What should we call you?</label>
+        <input type="text" id="nameInput" placeholder="Enter your name" maxlength="24" autocomplete="off" autofocus>
+        <div id="nameHint" class="name-hint">Please enter your name first</div>
+    </div>
+
+    <!-- Primary CTA -->
+    <button class="cta-btn" id="btnCreate" onclick="handleCreate()">Start a family call</button>
+
+    <!-- Divider -->
+    <div class="divider"><span>or</span></div>
+
+    <!-- Join section -->
+    <div class="join-section">
+        <label>Join a call</label>
+        <div class="join-row">
+            <input type="text" id="codeInput" placeholder="Enter code (e.g. ABC123)" maxlength="12" autocomplete="off">
+            <button class="join-btn" id="btnJoin" onclick="handleJoin()">Join</button>
+        </div>
+    </div>
+
+    <!-- Microcopy -->
+    <p class="microcopy">Flip your camera to share real-life moments</p>
+</div>
+
+<script>
+const nameInput = document.getElementById('nameInput');
+const nameHint = document.getElementById('nameHint');
+const btnCreate = document.getElementById('btnCreate');
+const btnJoin = document.getElementById('btnJoin');
+let hintTimer = null;
+
+function showHint() {
+    nameHint.classList.add('show');
+    nameInput.focus();
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => nameHint.classList.remove('show'), 3000);
+}
+
+nameInput.addEventListener('input', () => {
+    nameHint.classList.remove('show');
+});
+
+function handleCreate() {
+    if (!nameInput.value.trim()) { showHint(); return; }
+    // TODO: wire to VibeLive createRoom flow
+    alert('Creating call for: ' + nameInput.value.trim());
+}
+
+function handleJoin() {
+    const code = document.getElementById('codeInput').value.trim();
+    if (!nameInput.value.trim()) { showHint(); return; }
+    if (!code) return;
+    // TODO: wire to VibeLive joinRoom flow
+    alert('Joining call: ' + code);
+}
+</script>
+
+</body>
+</html>
