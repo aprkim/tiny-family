@@ -2125,11 +2125,8 @@ VibeLive.on('remoteJoined', (memberId) => {
 });
 
 VibeLive.on('remoteLeft', (memberId) => {
-    // Remove tile manually in case SDK auto-removal isn't available
-    const m = VibeLive.getMember(memberId);
-    if (!m || m.displayStatus === 'EXITED') {
-        document.getElementById(`tile-${memberId}-camera`)?.remove();
-    }
+    // Remove ALL tiles for this member — registerTile() cleanup fails if tile was moved to a different parent (drag, spotlight, etc.)
+    document.querySelectorAll(`.video-tile[data-member-id="${memberId}"]`).forEach(t => t.remove());
     updateGridLayout();
 });
 
@@ -2162,9 +2159,9 @@ VibeLive.on('memberStateChange', (memberId, state) => {
     // state = { status, live, video, audio, screenVideo }
     console.log('[memberStateChange]', memberId, JSON.stringify(state));
 
-    // Remove tile if member exited
+    // Remove ALL tiles if member exited (querySelectorAll catches relocated tiles)
     if (state.status === 'EXITED' && memberId !== VibeLive.memberId) {
-        document.getElementById(`tile-${memberId}-camera`)?.remove();
+        document.querySelectorAll(`.video-tile[data-member-id="${memberId}"]`).forEach(t => t.remove());
         updateGridLayout();
         return;
     }
