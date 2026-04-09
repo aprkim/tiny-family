@@ -2116,8 +2116,12 @@ VibeLive.on('remoteJoined', (memberId) => {
     updateGridLayout();
 });
 
-// remoteLeft: tiles auto-removed by SDK when member exits (registered tiles).
-VibeLive.on('remoteLeft', () => {
+VibeLive.on('remoteLeft', (memberId) => {
+    // Remove tile manually in case SDK auto-removal isn't available
+    const m = VibeLive.getMember(memberId);
+    if (!m || m.displayStatus === 'EXITED') {
+        document.getElementById(`tile-${memberId}-camera`)?.remove();
+    }
     updateGridLayout();
 });
 
@@ -2149,6 +2153,14 @@ VibeLive.on('remoteStreamStart', (memberId, streamType) => {
 VibeLive.on('memberStateChange', (memberId, state) => {
     // state = { status, live, video, audio, screenVideo }
     console.log('[memberStateChange]', memberId, JSON.stringify(state));
+
+    // Remove tile if member exited
+    if (state.status === 'EXITED' && memberId !== VibeLive.memberId) {
+        document.getElementById(`tile-${memberId}-camera`)?.remove();
+        updateGridLayout();
+        return;
+    }
+
     const camTileId = `tile-${memberId}-camera`;
     const camTile = document.getElementById(camTileId);
     if (!camTile) return;
