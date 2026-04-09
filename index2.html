@@ -144,6 +144,22 @@ body {
 .card input:focus { border-color: var(--accent); }
 .card input::placeholder { color: var(--muted2); }
 
+.standalone-input {
+    font-family: var(--sans);
+    font-size: 1rem;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: calc(var(--radius) * 0.6);
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.standalone-input:focus { border-color: var(--accent); }
+.standalone-input::placeholder { color: var(--muted2); }
+
 /* ===== Primary CTA ===== */
 .cta-btn {
     font-family: var(--sans);
@@ -279,8 +295,8 @@ body {
     </div>
 
     <!-- Name input -->
-    <div class="card">
-        <input type="text" id="nameInput" placeholder="Enter your name" maxlength="24" autocomplete="off" autofocus>
+    <div>
+        <input type="text" id="nameInput" class="standalone-input" placeholder="Enter your name" maxlength="24" autocomplete="off" autofocus>
         <div id="nameHint" class="name-hint">Please enter your name first</div>
     </div>
 
