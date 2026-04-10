@@ -1391,7 +1391,18 @@ window.createRoom = async () => {
 window.joinRoom = async () => {
     const name = nameInput.value.trim();
     const code = codeInput.value.trim();
-    if (!name || !code) return;
+    if (!name) {
+        nameHint.classList.add('show');
+        nameInput.focus();
+        clearTimeout(nameHintTimer);
+        nameHintTimer = setTimeout(() => nameHint.classList.remove('show'), 3000);
+        return;
+    }
+    if (!code) {
+        codeInput.focus();
+        showToast('Enter a room code to join');
+        return;
+    }
 
     if (requiredPin) {
         const enteredPin = document.getElementById('pinInput').value.replace(/\D/g, '');
