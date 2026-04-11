@@ -2186,6 +2186,12 @@ VibeLive.on('remoteJoined', (memberId) => {
         document.getElementById('cameraGrid').appendChild(tile);
         VibeLive.registerTile(memberId, 'camera', tile);
     }
+    // Apply current state — memberStateChange may have fired before tile existed
+    const state = VibeLive.getMemberState(memberId);
+    if (state) {
+        const camTile = document.getElementById(`tile-${memberId}-camera`);
+        if (camTile) updateTileIndicators(camTile, state.video === 'ON', state.audio === 'ON', state.live);
+    }
     updateGridLayout();
 });
 
@@ -2211,6 +2217,12 @@ VibeLive.on('remoteStreamStart', (memberId, streamType) => {
             document.getElementById('cameraGrid').appendChild(tile);
             VibeLive.registerTile(memberId, 'camera', tile);
         }
+    }
+
+    // Apply current state — memberStateChange may have fired before tile existed
+    const state = VibeLive.getMemberState(memberId);
+    if (state && tile) {
+        updateTileIndicators(tile, state.video === 'ON', state.audio === 'ON', state.live);
     }
 
     updateGridLayout();
@@ -2355,8 +2367,8 @@ VibeLive.on('error', (context, error) => {
         showError('This room is full. Please try again later.');
         return;
     }
-    if (code === 'ROOM_DISABLED') {
-        showError('This room is no longer available.');
+    if (code === 'ROOM_DISABLED' || code === 'ROOM_CLOSED') {
+        showError('This room is not currently available.');
         teardown();
         return;
     }
